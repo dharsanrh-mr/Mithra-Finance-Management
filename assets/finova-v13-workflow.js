@@ -1,1 +1,1 @@
-
+/* Optional workflow script placeholder. Core app is in app.js. */
