@@ -1596,4 +1596,113 @@ window.professionalCenter=professionalCenter;
   setInterval(()=>{try{mpPolishStatuses()}catch(e){}},5000);
   save();
 
+
+  /* ============================================================
+     MITHRA SMART OPERATIONS
+     Additive-only: anomaly detection, reconciliation suggestions,
+     balance explanation, payment-pattern analysis, business-day
+     lifecycle. No existing page/function is replaced.
+     ============================================================ */
+  data.mithraSmartOps=data.mithraSmartOps||{businessDay:'OPEN',openedAt:today};
+  save();
+
+  const soLoan=id=>data.loans.find(x=>x.id===id);
+  const soCust=id=>data.customers.find(x=>x.id===id);
+  const soPayments=id=>data.payments.filter(x=>x.loanId===id);
+  const soNum=x=>Number(x||0);
+  const soDate=d=>String(d||'');
+  const soDays=(a,b)=>Math.max(0,Math.floor((Date.parse(b)-Date.parse(a))/86400000));
+
+  window.mithraBalanceExplain=function(id){
+    const l=soLoan(id); if(!l)return;
+    const ps=soPayments(id), paid=ps.reduce((s,p)=>s+soNum(p.amount),0);
+    const principal=soNum(l.principal||l.amount||l.loanAmount);
+    const interest=soNum(l.interest||l.totalInterest);
+    const charges=soNum(l.fees||l.processingFee||l.charges);
+    const shown=soNum(l.balance);
+    const calculated=Math.max(0,principal+interest+charges-paid);
+    openModal('Balance Explanation',`
+      <div class="cards">
+        <div class="card"><div class="label">Principal</div><div class="value">${muMoney(principal)}</div></div>
+        <div class="card"><div class="label">Interest</div><div class="value">${muMoney(interest)}</div></div>
+        <div class="card"><div class="label">Charges</div><div class="value">${muMoney(charges)}</div></div>
+        <div class="card"><div class="label">Paid</div><div class="value">${muMoney(paid)}</div></div>
+      </div>
+      <div class="detail-list" style="margin-top:14px"><span>Calculated balance <b>${muMoney(calculated)}</b></span><span>Recorded balance <b>${muMoney(shown)}</b></span><span>Difference <b>${muMoney(calculated-shown)}</b></span></div>`);
+  };
+
+  window.mithraPaymentPattern=function(id){
+    const l=soLoan(id), ps=soPayments(id).sort((a,b)=>soDate(a.date).localeCompare(soDate(b.date)));
+    if(!l)return;
+    let gaps=[]; for(let i=1;i<ps.length;i++)gaps.push(soDays(ps[i-1].date,ps[i].date));
+    const late=ps.filter(p=>l.due&&soDate(p.date)>soDate(l.due)).length;
+    const avg=gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):0;
+    const total=ps.reduce((s,p)=>s+soNum(p.amount),0);
+    openModal('Payment Pattern',`
+      <div class="cards"><div class="card"><div class="label">Payments</div><div class="value">${ps.length}</div></div><div class="card"><div class="label">Total Paid</div><div class="value">${muMoney(total)}</div></div><div class="card"><div class="label">Late Payments</div><div class="value">${late}</div></div><div class="card"><div class="label">Avg Gap</div><div class="value">${avg||0} days</div></div></div>
+      <div class="settings-note" style="margin-top:12px">Pattern is descriptive only and does not make lending or collection decisions automatically.</div>`);
+  };
+
+  window.mithraAnomalies=function(){
+    const found=[];
+    const seen={};
+    data.payments.forEach(p=>{
+      const key=[p.loanId,p.date,soNum(p.amount),p.ref||''].join('|');
+      if(seen[key])found.push({level:'high',title:'Possible repeated payment',detail:`${p.id} resembles ${seen[key]}`});
+      else seen[key]=p.id;
+      if(!soLoan(p.loanId))found.push({level:'high',title:'Payment without loan',detail:p.id});
+      if(soNum(p.amount)<=0)found.push({level:'high',title:'Non-positive payment',detail:p.id});
+    });
+    data.loans.forEach(l=>{
+      if(soNum(l.balance)<0)found.push({level:'high',title:'Negative balance',detail:l.id});
+      if(l.start&&l.due&&soDate(l.due)<soDate(l.start))found.push({level:'medium',title:'Date anomaly',detail:`${l.id}: due before start`});
+    });
+    const amounts=data.payments.map(p=>soNum(p.amount)).filter(x=>x>0);
+    const avg=amounts.length?amounts.reduce((a,b)=>a+b,0)/amounts.length:0;
+    const threshold=avg*5;
+    data.payments.forEach(p=>{if(threshold>0&&soNum(p.amount)>threshold)found.push({level:'medium',title:'Unusually large payment',detail:`${p.id}: ${muMoney(p.amount)}`})});
+    openModal('Anomaly Detector',`
+      <div class="cards"><div class="card"><div class="label">Findings</div><div class="value">${found.length}</div></div><div class="card"><div class="label">High</div><div class="value">${found.filter(x=>x.level==='high').length}</div></div><div class="card"><div class="label">Medium</div><div class="value">${found.filter(x=>x.level==='medium').length}</div></div><div class="card"><div class="label">Payments Scanned</div><div class="value">${data.payments.length}</div></div></div>
+      <div class="table-scroll" style="margin-top:14px"><table class="table"><thead><tr><th>LEVEL</th><th>FINDING</th><th>DETAIL</th></tr></thead><tbody>${found.slice(0,50).map(x=>`<tr><td>${x.level==='high'?'🔴':'🟠'} ${x.level}</td><td>${esc(x.title)}</td><td>${esc(x.detail)}</td></tr>`).join('')||'<tr><td colspan="3"><div class="empty">No anomalies detected.</div></td></tr>'}</tbody></table></div>`);
+  };
+
+  window.mithraReconcile=function(){
+    const rows=[];
+    const refs={};
+    data.payments.forEach(p=>{const r=String(p.ref||p.reference||'').trim();if(r){if(refs[r])rows.push({type:'Duplicate reference candidate',ref:r,items:[refs[r],p.id]});else refs[r]=p.id}});
+    const loans=new Set(data.loans.map(l=>l.id));
+    data.payments.forEach(p=>{if(!loans.has(p.loanId))rows.push({type:'Unmatched payment',ref:p.id,items:[p.loanId||'No loan']})});
+    openModal('Reconciliation Matching',`
+      <div class="cards"><div class="card"><div class="label">Suggestions</div><div class="value">${rows.length}</div></div><div class="card"><div class="label">Payments</div><div class="value">${data.payments.length}</div></div><div class="card"><div class="label">Matched Loans</div><div class="value">${data.payments.filter(p=>loans.has(p.loanId)).length}</div></div><div class="card"><div class="label">Unmatched</div><div class="value">${data.payments.filter(p=>!loans.has(p.loanId)).length}</div></div></div>
+      <div class="table-scroll" style="margin-top:14px"><table class="table"><thead><tr><th>TYPE</th><th>REFERENCE</th><th>RECORDS</th></tr></thead><tbody>${rows.slice(0,50).map(x=>`<tr><td>${esc(x.type)}</td><td>${esc(x.ref)}</td><td>${esc(x.items.join(', '))}</td></tr>`).join('')||'<tr><td colspan="3"><div class="empty">No reconciliation suggestions.</div></td></tr>'}</tbody></table></div>`);
+  };
+
+  window.mithraBusinessDay=function(){
+    const state=data.mithraSmartOps.businessDay||'OPEN';
+    const action=state==='OPEN'?'Close Day':'Re-open Day';
+    openModal('Business Day Lifecycle',`
+      <div class="cards"><div class="card"><div class="label">Current State</div><div class="value">${esc(state)}</div></div><div class="card"><div class="label">Opened</div><div class="value">${esc(data.mithraSmartOps.openedAt||today)}</div></div></div>
+      <div class="detail-list" style="margin-top:14px"><span>Workflow <b>Open → Operations → Reconciliation → Close</b></span><span>Current date <b>${esc(today)}</b></span></div>
+      <div class="form-actions"><button class="btn" onclick="mithraToggleBusinessDay()">${action}</button><button class="btn" onclick="mithraReconcile()">Reconciliation</button></div>`);
+  };
+
+  window.mithraToggleBusinessDay=function(){
+    const old=data.mithraSmartOps.businessDay||'OPEN';
+    data.mithraSmartOps.businessDay=old==='OPEN'?'CLOSED':'OPEN';
+    if(data.mithraSmartOps.businessDay==='OPEN')data.mithraSmartOps.openedAt=today;
+    save(); toast(data.mithraSmartOps.businessDay==='CLOSED'?'Business day closed':'Business day opened');
+    mithraBusinessDay();
+  };
+
+  function soInstall(){
+    const host=[...document.querySelectorAll('button,a')].find(x=>/Action Center/i.test(x.textContent||''))?.parentElement;
+    if(host&&!host.querySelector('[data-mithra-smartops]')){
+      const wrap=document.createElement('div');wrap.dataset.mithraSmartops='1';wrap.className='form-actions';
+      wrap.innerHTML='<button class="btn" onclick="mithraAnomalies()">Anomalies</button><button class="btn" onclick="mithraReconcile()">Reconcile</button><button class="btn" onclick="mithraBusinessDay()">Business Day</button>';
+      host.appendChild(wrap);
+    }
+  }
+  setTimeout(soInstall,700); setInterval(()=>{try{soInstall()}catch(e){}},5000);
+  save();
+
 })();

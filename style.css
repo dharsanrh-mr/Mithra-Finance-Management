@@ -450,3 +450,5 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
 .mp-command-item small,.mp-row small{opacity:.65}
 .mp-status{transition:transform .15s ease,filter .15s ease}
 .mp-status:hover{transform:translateY(-1px)}
+
+/* Smart Operations: additive styling only */
