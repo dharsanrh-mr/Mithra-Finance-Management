@@ -1993,4 +1993,260 @@ window.professionalCenter=professionalCenter;
   setTimeout(mcInstall,700);setInterval(()=>{try{mcInstall()}catch(e){}},5000);
   save();
 
+
+  /* ============================================================
+     MITHRA COMMAND CENTER
+     Additive-only: command center, today workspace, 360 views,
+     data quality, reconciliation workspace and global command search.
+     ============================================================ */
+  data.mithraCommand=data.mithraCommand||{lastCommand:'',recent:[]};
+  data.mithraCommand.recent=Array.isArray(data.mithraCommand.recent)?data.mithraCommand.recent:[];
+  save();
+
+  function mcCountOutstanding(){
+    return data.loans.filter(l=>Number(l.balance||0)>0).length;
+  }
+  function mcOverdueLoans(){
+    return data.loans.filter(l=>Number(l.balance||0)>0&&l.due&&l.due<today);
+  }
+  function mcTodayDue(){
+    return data.loans.filter(l=>Number(l.balance||0)>0&&l.due===today);
+  }
+  function mcQuality(){
+    const issues=[];
+    data.customers.forEach(c=>{
+      if(!c.name)issues.push(['Customer','Missing name',c.id]);
+      if(!c.mobile)issues.push(['Customer','Missing mobile',c.id]);
+    });
+    data.loans.forEach(l=>{
+      if(!l.customerId||!soCust(l.customerId))issues.push(['Loan','Missing/invalid customer',l.id]);
+      if(l.start&&l.due&&String(l.due)<String(l.start))issues.push(['Loan','Due before start',l.id]);
+      if(Number(l.balance||0)<0)issues.push(['Loan','Negative balance',l.id]);
+    });
+    const ids={};
+    data.payments.forEach(p=>{
+      const k=[p.loanId,p.date,Number(p.amount||0),p.ref||p.reference||''].join('|');
+      if(ids[k])issues.push(['Payment','Duplicate candidate',p.id]);
+      ids[k]=p.id;
+      if(!soLoan(p.loanId))issues.push(['Payment','Unmatched loan',p.id]);
+    });
+    return issues;
+  }
+
+  window.mithraCommandCenter=function(){
+    const overdue=mcOverdueLoans(),due=mcTodayDue(),quality=mcQuality(),actions=mpProActions();
+    openModal('Mithra Command Center',`
+      <div class="mcc-grid">
+        <button class="mcc-card danger" onclick="mithraTodayWorkspace()"><small>OVERDUE</small><strong>${overdue.length}</strong><span>Open accounts</span></button>
+        <button class="mcc-card" onclick="mithraTodayWorkspace()"><small>DUE TODAY</small><strong>${due.length}</strong><span>Today's collection</span></button>
+        <button class="mcc-card" onclick="mithraDataQualityCenter()"><small>DATA QUALITY</small><strong>${quality.length}</strong><span>Items to review</span></button>
+        <button class="mcc-card" onclick="mithraReconciliationWorkspace()"><small>RECONCILIATION</small><strong>${data.payments.filter(p=>!soLoan(p.loanId)).length}</strong><span>Unmatched candidates</span></button>
+      </div>
+      <div class="mcc-section"><div class="mcc-section-head"><b>What needs attention?</b><button class="btn" onclick="mithraTodayWorkspace()">Open workspace</button></div>
+      ${actions.slice(0,6).map(x=>`<div class="mcc-attention"><span>${x.level==='critical'?'🔴':'🟠'}</span><div><b>${mpEsc(x.text)}</b><small>${mpEsc(x.kind)} · ${mpEsc(x.detail)}</small></div></div>`).join('')||'<div class="empty">Everything looks clear.</div>'}</div>`);
+  };
+
+  window.mithraTodayWorkspace=function(){
+    const due=mcTodayDue(),over=mcOverdueLoans(),tasks=data.mithraControl?.tasks||[];
+    openModal('Today Workspace',`
+      <div class="mcc-tabs"><b>Today</b><span>${today}</span></div>
+      <div class="mcc-work-grid">
+        <section><h4>💰 Due Today (${due.length})</h4>${due.slice(0,20).map(l=>`<button class="mcc-row" onclick="mithraDueActions('${mpEsc(l.id)}')"><b>${mpEsc(soCust(l.customerId)?.name||l.id)}</b><small>${muMoney(l.installment||l.balance)} · ${mpEsc(l.id)}</small></button>`).join('')||'<div class="empty">No dues today.</div>'}</section>
+        <section><h4>🚨 Overdue (${over.length})</h4>${over.slice(0,20).map(l=>`<button class="mcc-row" onclick="mithraDueActions('${mpEsc(l.id)}')"><b>${mpEsc(soCust(l.customerId)?.name||l.id)}</b><small>${muMoney(l.balance)} · ${mpEsc(l.due)}</small></button>`).join('')||'<div class="empty">No overdue loans.</div>'}</section>
+        <section><h4>✓ Tasks (${tasks.filter(t=>t.status!=='Done').length})</h4>${tasks.filter(t=>t.status!=='Done').slice(0,12).map(t=>`<button class="mcc-row" onclick="mithraTaskBoard()"><b>${mpEsc(t.title)}</b><small>${mpEsc(t.status)} · ${mpEsc(t.priority)}</small></button>`).join('')||'<div class="empty">No open tasks.</div>'}</section>
+      </div>`);
+  };
+
+  window.mithraCustomer360=function(id){
+    const c=soCust(id);if(!c)return;
+    const loans=data.loans.filter(l=>l.customerId===id), payments=data.payments.filter(p=>loans.some(l=>l.id===p.loanId));
+    openModal('Customer 360',`
+      <div class="mcc-profile"><div class="mcc-avatar">👤</div><div><h3>${mpEsc(c.name||id)}</h3><small>${mpEsc(c.mobile||'No mobile')} · ${mpEsc(id)}</small></div></div>
+      <div class="mcc-360-grid"><div><small>Loans</small><b>${loans.length}</b></div><div><small>Outstanding</small><b>${muMoney(loans.reduce((s,l)=>s+Number(l.balance||0),0))}</b></div><div><small>Payments</small><b>${payments.length}</b></div><div><small>Last payment</small><b>${mpEsc(payments.sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]?.date||'-')}</b></div></div>
+      <div class="mcc-toolbar"><button class="btn" onclick="mithraTimeline('Customer','${mpEsc(id)}')">Timeline</button><button class="btn" onclick="mithraCustomerActions('${mpEsc(id)}')">Actions</button></div>
+      <div class="mcc-related"><b>Related Loans</b>${loans.map(l=>`<button class="mcc-row" onclick="mithraLoan360('${mpEsc(l.id)}')"><b>${mpEsc(l.id)}</b><small>${muMoney(l.balance||0)} · ${mpEsc(l.status||'')}</small></button>`).join('')||'<div class="empty">No loans.</div>'}</div>`);
+  };
+
+  window.mithraLoan360=function(id){
+    const l=soLoan(id);if(!l)return;
+    const c=soCust(l.customerId),ps=soPayments(id);
+    openModal('Loan 360',`
+      <div class="mcc-profile"><div class="mcc-avatar">💳</div><div><h3>${mpEsc(id)}</h3><small>${mpEsc(c?.name||l.customerId||'-')} · ${mpEsc(l.status||'')}</small></div></div>
+      <div class="mcc-360-grid"><div><small>Principal</small><b>${muMoney(l.principal||l.amount||0)}</b></div><div><small>Balance</small><b>${muMoney(l.balance||0)}</b></div><div><small>Payments</small><b>${ps.length}</b></div><div><small>Due</small><b>${mpEsc(l.due||'-')}</b></div></div>
+      <div class="mcc-toolbar"><button class="btn" onclick="mithraBalanceExplain('${mpEsc(id)}')">Balance</button><button class="btn" onclick="mithraPaymentPattern('${mpEsc(id)}')">Payment Pattern</button><button class="btn" onclick="mithraTimeline('Loan','${mpEsc(id)}')">Timeline</button></div>`);
+  };
+
+  window.mithraDataQualityCenter=function(){
+    const q=mcQuality();
+    openModal('Data Quality Center',`
+      <div class="mcc-summary"><b>${q.length}</b><span>items require review</span></div>
+      <div class="mcc-quality-list">${q.slice(0,80).map(x=>`<div class="mcc-quality"><span>${x[0]}</span><div><b>${mpEsc(x[1])}</b><small>${mpEsc(x[2])}</small></div></div>`).join('')||'<div class="empty">No quality issues detected.</div>'}</div>`);
+  };
+
+  window.mithraReconciliationWorkspace=function(){
+    const unmatched=data.payments.filter(p=>!soLoan(p.loanId));
+    const dup=[];const seen={};
+    data.payments.forEach(p=>{const k=[p.loanId,p.date,Number(p.amount||0),p.ref||p.reference||''].join('|');if(seen[k])dup.push([seen[k],p.id]);else seen[k]=p.id;});
+    openModal('Reconciliation Workspace',`
+      <div class="mcc-recon-head"><div><b>${unmatched.length}</b><small>unmatched payments</small></div><div><b>${dup.length}</b><small>duplicate candidates</small></div></div>
+      <div class="mcc-section"><div class="mcc-section-head"><b>Unmatched payments</b><button class="btn" onclick="mithraReconcile()">Full reconciliation</button></div>
+      ${unmatched.slice(0,40).map(p=>`<div class="mcc-row"><div><b>${mpEsc(p.id)}</b><small>${mpEsc(p.date||'')} · ${muMoney(p.amount)}</small></div><span class="mp-status">UNMATCHED</span></div>`).join('')||'<div class="empty">No unmatched payments.</div>'}</div>
+      <div class="mcc-section"><b>Duplicate candidates</b>${dup.slice(0,20).map(x=>`<div class="mcc-row"><b>${mpEsc(x[0])}</b><small>similar to ${mpEsc(x[1])}</small></div>`).join('')||'<div class="empty">None.</div>'}</div>`);
+  };
+
+  window.mithraGlobalCommand=function(){
+    openModal('Mithra Command',`
+      <div class="mcc-command-input"><input id="mccCmd" autofocus placeholder="Type an action or record..." oninput="mithraRunCommand(this.value)"></div>
+      <div id="mccCmdResults" class="mcc-command-results">
+        ${[
+          ['Command Center','Open operational control center','mithraCommandCenter()'],
+          ['Today Workspace','Due, overdue and tasks','mithraTodayWorkspace()'],
+          ['Customer 360','Customer overview','mithraAdvancedSearch()'],
+          ['Data Quality','Find data issues','mithraDataQualityCenter()'],
+          ['Reconciliation','Match payment records','mithraReconciliationWorkspace()'],
+          ['Saved Views','Open saved filters','mithraSavedViews()'],
+          ['Task Board','Manage tasks','mithraTaskBoard()']
+        ].map(x=>`<button class="mcc-command-item" onclick="${x[2]}"><b>${x[0]}</b><small>${x[1]}</small></button>`).join('')}
+      </div>`);
+  };
+  window.mithraRunCommand=function(q){
+    q=String(q||'').toLowerCase().trim();data.mithraCommand.lastCommand=q;save();
+    const box=document.getElementById('mccCmdResults');if(!box)return;
+    const actions=[
+      ['Command Center','Operational overview','mithraCommandCenter()'],
+      ['Today Workspace','Due, overdue and tasks','mithraTodayWorkspace()'],
+      ['Customer 360','Customer overview','mithraAdvancedSearch()'],
+      ['Data Quality','Data validation','mithraDataQualityCenter()'],
+      ['Reconciliation','Payment matching','mithraReconciliationWorkspace()'],
+      ['Saved Views','Saved filters','mithraSavedViews()'],
+      ['Task Board','Tasks','mithraTaskBoard()'],
+      ['Notifications','Alerts','mithraNotificationDrawer()']
+    ];
+    const records=[];
+    data.customers.forEach(c=>{if(`${c.name} ${c.mobile} ${c.id}`.toLowerCase().includes(q))records.push(['Customer',c.name||c.id,`mithraCustomer360('${c.id}')`])});
+    data.loans.forEach(l=>{if(`${l.id} ${l.customerId}`.toLowerCase().includes(q))records.push(['Loan',l.id,`mithraLoan360('${l.id}')`])});
+    const list=actions.filter(x=>!q||`${x[0]} ${x[1]}`.toLowerCase().includes(q)).map(x=>`<button class="mcc-command-item" onclick="${x[2]}"><b>${x[0]}</b><small>${x[1]}</small></button>`).concat(records.slice(0,15).map(x=>`<button class="mcc-command-item" onclick="${x[2]}"><b>${mpEsc(x[0])} · ${mpEsc(x[1])}</b><small>Open 360 view</small></button>`));
+    box.innerHTML=list.join('')||'<div class="empty">No commands or records found.</div>';
+  };
+
+  function mccInstall(){
+    const top=document.querySelector('.top-actions');
+    if(top&&!top.querySelector('[data-mithra-command]')){
+      const w=document.createElement('div');w.dataset.mithraCommand='1';w.className='mcc-tools';
+      w.innerHTML=`<button class="icon-btn" title="Command Center" onclick="mithraCommandCenter()">⌘</button><button class="icon-btn" title="Command Search" onclick="mithraGlobalCommand()">⚡</button>`;
+      top.insertBefore(w,top.firstChild);
+    }
+  }
+  setTimeout(mccInstall,700);setInterval(()=>{try{mccInstall()}catch(e){}},5000);
+  save();
+
+
+  /* ============================================================
+     MITHRA INTELLIGENT FINANCE OS
+     Additive-only intelligence layer. Suggestions/explanations/
+     simulations only; never executes financial decisions.
+     ============================================================ */
+  data.mithraIntel=data.mithraIntel||{goals:[],lastScenario:null};
+  data.mithraIntel.goals=Array.isArray(data.mithraIntel.goals)?data.mithraIntel.goals:[];
+  save();
+
+  function miLoans(){return data.loans||[]}
+  function miPayments(){return data.payments||[]}
+  function miOutstanding(){return miLoans().reduce((s,l)=>s+Number(l.balance||0),0)}
+  function miCollection30(){
+    const cut=muDaysAgo(30);
+    return miPayments().filter(p=>String(p.date||'')>=String(cut)&&String(p.date||'')<=String(today)).reduce((s,p)=>s+Number(p.amount||0),0);
+  }
+  function miTopIssues(){
+    return mcQuality().slice(0,8).concat(mpProActions().slice(0,8).map(x=>['Operations',x.text,x.detail]));
+  }
+
+  window.mithraFinanceCopilot=function(){
+    const overdue=mcOverdueLoans(),due=mcTodayDue(),issues=miTopIssues();
+    openModal('Mithra Finance Copilot',`
+      <div class="mio-copilot"><div class="mio-orb">✦</div><div><h3>Finance Copilot</h3><small>Explains existing system data. It does not execute financial decisions.</small></div></div>
+      <div class="mio-suggestions">
+        <button onclick="mithraIntelExplain('collection')"><b>How is collection trending?</b><small>Review recent collection activity</small></button>
+        <button onclick="mithraIntelExplain('attention')"><b>What needs attention?</b><small>${overdue.length} overdue · ${due.length} due today</small></button>
+        <button onclick="mithraIntelExplain('balance')"><b>Explain outstanding</b><small>${muMoney(miOutstanding())} across current loans</small></button>
+        <button onclick="mithraIntelExplain('quality')"><b>Are there data issues?</b><small>${issues.length} review items surfaced</small></button>
+      </div>`);
+  };
+  window.mithraIntelExplain=function(kind){
+    const overdue=mcOverdueLoans(),due=mcTodayDue(),issues=mcQuality(),c30=miCollection30(),out=miOutstanding();
+    let title='',body='';
+    if(kind==='collection'){title='Collection Explanation';body=`Last 30 days recorded collection: <b>${muMoney(c30)}</b>. This is a descriptive snapshot of recorded payments, not a forecast.`}
+    if(kind==='attention'){title='Attention Summary';body=`There are <b>${overdue.length}</b> overdue loans and <b>${due.length}</b> loans due today. Open Today Workspace to review them.`}
+    if(kind==='balance'){title='Outstanding Explanation';body=`Current recorded outstanding across loans is <b>${muMoney(out)}</b>. Use Balance Breakdown on an individual loan to inspect its components.`}
+    if(kind==='quality'){title='Data Quality Explanation';body=`The system currently surfaces <b>${issues.length}</b> data-quality findings. These are review suggestions and are not automatically corrected.`}
+    openModal(title,`<div class="mio-explain">${body}</div><div class="mcc-toolbar"><button class="btn" onclick="mithraDataQualityCenter()">Review</button><button class="btn" onclick="mithraTodayWorkspace()">Open Workspace</button></div>`);
+  };
+
+  window.mithraRelationshipGraph=function(id){
+    const c=soCust(id);if(!c)return;
+    const loans=data.loans.filter(l=>l.customerId===id), payments=data.payments.filter(p=>loans.some(l=>l.id===p.loanId));
+    openModal('Customer Relationship Map',`
+      <div class="mio-graph"><div class="mio-node main">👤<b>${mpEsc(c.name||id)}</b><small>Customer</small></div>
+      <div class="mio-connect">↕</div>
+      <div class="mio-node-row">${loans.map(l=>`<button class="mio-node" onclick="mithraLoan360('${mpEsc(l.id)}')">💳<b>${mpEsc(l.id)}</b><small>Loan · ${muMoney(l.balance||0)}</small></button>`).join('')||'<div class="empty">No linked loans.</div>'}</div>
+      <div class="mio-connect">↕</div>
+      <div class="mio-node-row"><div class="mio-node">💰<b>${payments.length}</b><small>Payments</small></div><div class="mio-node">📅<b>${(data.followups||[]).filter(f=>f.customerId===id).length}</b><small>Follow-ups</small></div></div></div>`);
+  };
+
+  window.mithraScenarioSimulator=function(){
+    openModal('Scenario Simulator',`
+      <div class="mio-form"><label>Additional payment amount<input id="miExtra" type="number" min="0" value="0"></label><label>Number of periods<input id="miPeriods" type="number" min="1" value="1"></label></div>
+      <div class="mcc-toolbar"><button class="btn" onclick="mithraRunScenario()">Run Simulation</button></div>
+      <div id="miScenarioResult" class="mio-result"><div class="empty">Simulation is isolated and does not change real records.</div></div>`);
+  };
+  window.mithraRunScenario=function(){
+    const extra=Math.max(0,Number(document.getElementById('miExtra')?.value||0)), periods=Math.max(1,Number(document.getElementById('miPeriods')?.value||1));
+    const before=miOutstanding(), reduction=Math.min(before,extra*periods), after=before-reduction;
+    const box=document.getElementById('miScenarioResult');if(!box)return;
+    data.mithraIntel.lastScenario={extra,periods,before,after};save();
+    box.innerHTML=`<div class="mio-scenario-grid"><div><small>Current outstanding</small><b>${muMoney(before)}</b></div><div><small>Simulated reduction</small><b>${muMoney(reduction)}</b></div><div><small>Illustrative remaining</small><b>${muMoney(after)}</b></div></div><small>This is a mathematical what-if only. No loan, payment, or balance is modified.</small>`;
+  };
+
+  window.mithraTrustCenter=function(){
+    const q=mcQuality(),unmatched=miPayments().filter(p=>!soLoan(p.loanId)).length,an=mpProActions().length;
+    openModal('Mithra Trust Center',`
+      <div class="mio-trust-grid">
+        <div><b>${q.length===0?'✓':'!'}</b><span>Data quality</span><small>${q.length} findings</small></div>
+        <div><b>${unmatched===0?'✓':'!'}</b><span>Reconciliation</span><small>${unmatched} unmatched</small></div>
+        <div><b>${an===0?'✓':'!'}</b><span>Operations</span><small>${an} attention items</small></div>
+        <div><b>✓</b><span>Decision safety</span><small>Suggestions only</small></div>
+      </div>
+      <div class="mio-explain">Trust Center is a monitoring surface. It does not silently alter records or approve financial actions.</div>`);
+  };
+
+  window.mithraSmartActions=function(type,id){
+    const actions=[];
+    if(type==='Customer'){actions.push(['Customer 360',`mithraCustomer360('${id}')`],['Relationship Map',`mithraRelationshipGraph('${id}')`],['Timeline',`mithraTimeline('Customer','${id}')`])}
+    if(type==='Loan'){actions.push(['Loan 360',`mithraLoan360('${id}')`],['Balance Explain',`mithraBalanceExplain('${id}')`],['Payment Pattern',`mithraPaymentPattern('${id}')`])}
+    openModal('Smart Actions',`<div class="mio-suggestions">${actions.map(a=>`<button onclick="${a[1]}"><b>${a[0]}</b><small>Open contextual view</small></button>`).join('')}</div>`);
+  };
+
+  window.mithraGoals=function(){
+    openModal('Goals & Targets',`
+      <div class="mcc-toolbar"><button class="btn" onclick="mithraAddGoal()">＋ Add Target</button></div>
+      <div class="mio-goals">${data.mithraIntel.goals.map((g,i)=>{const pct=Math.min(100,Math.round((Number(g.current||0)/Math.max(1,Number(g.target||1)))*100));return `<div class="mio-goal"><div><b>${mpEsc(g.name)}</b><small>${muMoney(g.current||0)} / ${muMoney(g.target||0)}</small></div><div class="mio-progress"><span style="width:${pct}%"></span></div><button class="icon-btn" onclick="mithraDeleteGoal(${i})">×</button></div>`}).join('')||'<div class="empty">No targets configured.</div>'}</div>`);
+  };
+  window.mithraAddGoal=function(){
+    const name=prompt('Target name');if(!name)return;
+    const target=Number(prompt('Target amount')||0);if(!target)return;
+    data.mithraIntel.goals.push({name,target,current:0});save();mithraGoals();
+  };
+  window.mithraDeleteGoal=function(i){data.mithraIntel.goals.splice(i,1);save();mithraGoals();};
+
+  function mioInstall(){
+    const top=document.querySelector('.top-actions');
+    if(top&&!top.querySelector('[data-mithra-intel]')){
+      const w=document.createElement('div');w.dataset.mithraIntel='1';w.className='mio-tools';
+      w.innerHTML=`<button class="icon-btn" title="Finance Copilot" onclick="mithraFinanceCopilot()">✦</button><button class="icon-btn" title="Scenario Simulator" onclick="mithraScenarioSimulator()">∿</button><button class="icon-btn" title="Trust Center" onclick="mithraTrustCenter()">✓</button><button class="icon-btn" title="Goals & Targets" onclick="mithraGoals()">◎</button>`;
+      top.insertBefore(w,top.firstChild);
+    }
+  }
+  setTimeout(mioInstall,800);setInterval(()=>{try{mioInstall()}catch(e){}},5000);
+  save();
+
 })();

@@ -531,3 +531,75 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
   .mc-mobile-bar small{display:block;font-size:10px;opacity:.65}
   body{padding-bottom:76px}
 }
+
+/* ============================================================
+   MITHRA COMMAND CENTER — additive styling
+   ============================================================ */
+.mcc-tools{display:flex;gap:5px;align-items:center}
+.mcc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.mcc-card{border:1px solid var(--border,#e5e7eb);background:var(--card,#fff);border-radius:13px;padding:13px;text-align:left;cursor:pointer;transition:.16s}
+.mcc-card:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.07)}
+.mcc-card small,.mcc-card span{display:block;opacity:.62}
+.mcc-card strong{display:block;font-size:1.5rem;margin:4px 0}
+.mcc-card.danger{border-left:3px solid currentColor}
+.mcc-section{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#e5e7eb)}
+.mcc-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.mcc-attention{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border,#e5e7eb)}
+.mcc-attention small,.mcc-row small{display:block;opacity:.62;margin-top:2px}
+.mcc-work-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.mcc-work-grid section{border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:10px}
+.mcc-work-grid h4{margin:0 0 8px}
+.mcc-row{width:100%;border:1px solid var(--border,#e5e7eb);background:var(--card,#fff);border-radius:9px;padding:9px;margin-bottom:6px;text-align:left;cursor:pointer}
+.mcc-profile{display:flex;gap:12px;align-items:center}
+.mcc-profile h3{margin:0 0 3px}
+.mcc-avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(127,127,127,.1)}
+.mcc-360-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:13px}
+.mcc-360-grid>div{padding:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px}
+.mcc-360-grid small{display:block;opacity:.62}.mcc-360-grid b{display:block;margin-top:3px}
+.mcc-related{margin-top:13px}
+.mcc-summary{padding:13px;border:1px solid var(--border,#e5e7eb);border-radius:12px}.mcc-summary b{font-size:1.5rem;display:block}
+.mcc-quality-list{margin-top:10px;max-height:420px;overflow:auto}
+.mcc-quality{display:flex;gap:10px;padding:10px;border-bottom:1px solid var(--border,#e5e7eb)}
+.mcc-quality>span{font-size:.75rem;opacity:.6;min-width:65px}
+.mcc-quality small{display:block;opacity:.62;margin-top:2px}
+.mcc-recon-head{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mcc-recon-head>div{padding:12px;border:1px solid var(--border,#e5e7eb);border-radius:11px}.mcc-recon-head b{display:block;font-size:1.4rem}.mcc-recon-head small{opacity:.62}
+.mcc-command-input input{width:100%;box-sizing:border-box}
+.mcc-command-results{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:430px;overflow:auto}
+.mcc-command-item{border:1px solid var(--border,#e5e7eb);background:var(--card,#fff);border-radius:10px;padding:10px;text-align:left;cursor:pointer}
+.mcc-command-item:hover{transform:translateY(-1px)}
+.mcc-command-item small{display:block;opacity:.62;margin-top:2px}
+@media(max-width:800px){.mcc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mcc-work-grid{grid-template-columns:1fr}.mcc-360-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){.mcc-grid{grid-template-columns:1fr}.mcc-360-grid{grid-template-columns:1fr}}
+
+/* ============================================================
+   MITHRA INTELLIGENT FINANCE OS — additive styling
+   ============================================================ */
+.mio-tools{display:flex;gap:4px;align-items:center}
+.mio-copilot{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--border,#e5e7eb);border-radius:13px}
+.mio-orb{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:rgba(127,127,127,.1);font-size:21px}
+.mio-copilot h3{margin:0 0 3px}.mio-copilot small{opacity:.62}
+.mio-suggestions{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.mio-suggestions button{border:1px solid var(--border,#e5e7eb);background:var(--card,#fff);border-radius:11px;padding:11px;text-align:left;cursor:pointer}
+.mio-suggestions button:hover{transform:translateY(-1px);box-shadow:0 5px 15px rgba(0,0,0,.06)}
+.mio-suggestions small{display:block;opacity:.62;margin-top:3px}
+.mio-explain{padding:13px;border:1px solid var(--border,#e5e7eb);border-radius:12px;line-height:1.55}
+.mio-graph{display:flex;flex-direction:column;align-items:center;gap:8px}
+.mio-node{min-width:130px;padding:11px;border:1px solid var(--border,#e5e7eb);background:var(--card,#fff);border-radius:12px;text-align:center;cursor:pointer}
+.mio-node.main{display:flex;flex-direction:column}
+.mio-node small,.mio-node b{display:block}.mio-node small{opacity:.62;margin-top:3px}
+.mio-node-row{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;width:100%}
+.mio-connect{opacity:.5;font-size:20px}
+.mio-form{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mio-form label{display:flex;flex-direction:column;gap:5px}.mio-form input{width:100%;box-sizing:border-box}
+.mio-result{margin-top:10px;padding:11px;border:1px solid var(--border,#e5e7eb);border-radius:11px}
+.mio-scenario-grid,.mio-trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mio-scenario-grid>div,.mio-trust-grid>div{padding:11px;border:1px solid var(--border,#e5e7eb);border-radius:11px}
+.mio-scenario-grid small,.mio-trust-grid span,.mio-trust-grid small{display:block;opacity:.62}.mio-scenario-grid b,.mio-trust-grid b{display:block;font-size:1.2rem;margin-bottom:3px}
+.mio-trust-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mio-goals{display:flex;flex-direction:column;gap:8px}
+.mio-goal{display:grid;grid-template-columns:1fr 120px auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--border,#e5e7eb);border-radius:11px}
+.mio-goal small{display:block;opacity:.62;margin-top:2px}
+.mio-progress{height:7px;border-radius:10px;background:rgba(127,127,127,.12);overflow:hidden}
+.mio-progress span{display:block;height:100%;background:currentColor;border-radius:10px}
+@media(max-width:650px){.mio-scenario-grid,.mio-trust-grid{grid-template-columns:1fr}.mio-form{grid-template-columns:1fr}.mio-goal{grid-template-columns:1fr}.mio-tools{gap:2px}}
