@@ -1,4 +1,4 @@
-FINOVA Finance App V5 - Collections V2
+Mithra Finance System Finance App V5 - Collections V2
 Features:
 - Today's / Week / Month collection summaries
 - Outstanding and overdue tracking

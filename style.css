@@ -20,7 +20,7 @@
 
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.settings-form{padding-top:3px}.settings-form label{font-size:10px;font-weight:700;color:#53657b;display:flex;flex-direction:column;gap:6px}.settings-form input,.settings-form select{border:1px solid #dbe3eb;border-radius:8px;padding:10px;background:#fff;font:inherit;color:#1d2f49}.settings-options{display:grid;gap:8px}.toggle-row{border:1px solid #e4eaf0;border-radius:9px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}.toggle-row span{display:flex;flex-direction:column;gap:3px}.toggle-row b{font-size:11px}.toggle-row small{font-size:9px;color:#8490a0}.toggle-row input{width:18px;height:18px;accent-color:#1eb477}.settings-note{font-size:9px;color:#7c8999;background:#f7f9fb;border-radius:8px;padding:10px;margin-top:12px;line-height:1.5}.data-actions{display:flex;gap:8px;flex-wrap:wrap}.danger-btn{color:#c94350!important;border-color:#f0cdd0!important}.settings-save{display:flex;justify-content:flex-end;margin-top:15px;padding-bottom:20px}@media(max-width:800px){.settings-grid{grid-template-columns:1fr}}
 .v7-profile{display:grid;gap:14px}.v7-hero{display:flex;justify-content:space-between;gap:15px;align-items:center}.v7-kpis{grid-template-columns:repeat(4,1fr)}.v7-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.v7-section{background:#fff;border:1px solid #e5eaf1;border-radius:12px;padding:14px}.v7-section .section-head{margin-bottom:8px}.v7-section h3{margin:0;font-size:14px}.v7-profile .table td small{display:block;color:#8995a5;font-size:9px;margin-top:3px}.v7-profile .progress-track{height:9px;background:#e9eef3;border-radius:20px;overflow:hidden}.v7-profile .progress-fill{height:100%;background:#20b477;border-radius:20px}.status.due-today{background:#fff5dc;color:#a16b00}.status.upcoming{background:#eef5ff;color:#4d73a8}.status.overdue{background:#fff0f1;color:#c84250}@media(max-width:700px){.v7-hero{align-items:flex-start;flex-direction:column}.v7-kpis{grid-template-columns:1fr 1fr}.v7-grid{grid-template-columns:1fr}.v7-profile .profile-actions{width:100%}}
-/* FINOVA V9 subtle sidebar polish */
+/* Mithra Finance System V9 subtle sidebar polish */
 .sidebar{width:252px;padding:18px 12px;background:#101827;box-shadow:8px 0 28px rgba(12,25,45,.05)}
 .brand{position:relative;padding:5px 9px 21px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:10px}
 .brand .logo{width:40px;height:40px;border-radius:12px;box-shadow:0 5px 14px rgba(32,184,121,.16)}
@@ -367,10 +367,10 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
   #modal .modal-card{width:min(760px,calc(100vw - 48px))}
 }
 
-/* FINOVA Professional Pack - functionality support only */
+/* Mithra Finance System Professional Pack - functionality support only */
 .closing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}.closing-grid>div{border:1px solid #e5ebf0;background:#f8fafb;border-radius:9px;padding:12px}.closing-grid span{display:block;color:#7c8999;font-size:9px;margin-bottom:5px}.closing-grid b{font-size:14px;color:#1d2f49}.followup-history{display:grid;gap:9px}.followup-item{border:1px solid #e4eaf0;border-radius:9px;padding:11px;background:#fff}.followup-item>div{display:flex;justify-content:space-between;gap:10px}.followup-item b{font-size:11px}.followup-item small{font-size:9px;color:#7c8999}.followup-item p{font-size:10px;color:#53657b;margin:7px 0 0;white-space:pre-wrap}.status.pending{background:#eef2f6;color:#66768a}.status.contacted{background:#eef5ff;color:#4d73a8}.status.promised{background:#fff5dc;color:#9b6900}.status.done{background:#e9f8f1;color:#138d59}@media(max-width:800px){.closing-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.closing-grid{grid-template-columns:1fr}}
 
-/* FINOVA UI-matched dialogs — visual refinement only; no page layout changes. */
+/* Mithra Finance System UI-matched dialogs — visual refinement only; no page layout changes. */
 #modal.modal{background:rgba(16,24,39,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 #modal .modal-card{background:#fff;border:1px solid #e4eaf1;border-radius:18px;padding:0;box-shadow:0 22px 60px rgba(21,32,54,.20);overflow:hidden}
 #modal .modal-head{margin:0;padding:17px 20px 14px;border-bottom:1px solid #edf1f5;background:#fff;position:sticky;top:0;z-index:3}
@@ -405,7 +405,7 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
 .modal-backdrop>.modal .modal-actions{border-top:1px solid #edf1f5;margin:20px 0 0;padding:14px 20px;background:#fafcfd}
 @media(max-width:520px){#modal #modalBody{padding:16px}#modal .modal-head{padding:14px 16px}#modal .form-actions{margin:16px -16px -16px;padding:12px 16px}.report-summary-grid{grid-template-columns:1fr}.toast{left:10px;right:10px;bottom:10px;max-width:none}}
 
-/* FINOVA UI-matched dialogs — visual refinement only; no page layout changes. */
+/* Mithra Finance System UI-matched dialogs — visual refinement only; no page layout changes. */
 #modal.modal{background:rgba(16,24,39,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 #modal .modal-card{background:#fff;border:1px solid #e4eaf1;border-radius:18px;padding:0;box-shadow:0 22px 60px rgba(21,32,54,.20);overflow:hidden}
 #modal .modal-head{margin:0;padding:17px 20px 14px;border-bottom:1px solid #edf1f5;background:#fff;position:sticky;top:0;z-index:3}

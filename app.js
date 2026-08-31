@@ -369,7 +369,7 @@ function downloadReportCSV(){
   const header=["Date","Type","Customer","Loan","Amount","Mode","Reference"];
   const body=rows.map(r=>[r.date,r.type,r.customer,r.loan,r.amount,r.mode,r.ref]);
   const csv=[header,...body].map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`finova-report-${range.start}-to-${range.end}.csv`;a.click();URL.revokeObjectURL(a.href);
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`mithra-finance-system-report-${range.start}-to-${range.end}.csv`;a.click();URL.revokeObjectURL(a.href);
 }
 function reportPrint(){window.print()}
 function reports(){
@@ -431,7 +431,7 @@ function appSettings(){
   `<div class="settings-grid">
     <div class="section"><div class="section-head"><div><h3>Business Profile</h3><p class="muted">Shown on receipts and reports</p></div></div>
       <div class="form-grid settings-form">
-        <label>Business Name<input id="setBusinessName" value="${esc(s.businessName||"FINOVA Finance")}"></label>
+        <label>Business Name<input id="setBusinessName" value="${esc(s.businessName||"Mithra Finance System")}"></label>
         <label>Owner / Admin Name<input id="setOwnerName" value="${esc(s.ownerName||"Admin")}"></label>
         <label>Mobile Number<input id="setMobile" value="${esc(s.mobile||"")}"></label>
         <label>Address<input id="setAddress" value="${esc(s.address||"")}"></label>
@@ -477,7 +477,7 @@ function saveSettings(){
   const pin2=document.getElementById("setPin2").value.trim();
   if(pin && (!/^\d{4,6}$/.test(pin)||pin!==pin2)) return toast("PIN must match and contain 4–6 digits");
   Object.assign(data.settings,{
-    businessName:document.getElementById("setBusinessName").value.trim()||"FINOVA Finance",
+    businessName:document.getElementById("setBusinessName").value.trim()||"Mithra Finance System",
     ownerName:document.getElementById("setOwnerName").value.trim()||"Admin",
     mobile:document.getElementById("setMobile").value.trim(),
     address:document.getElementById("setAddress").value.trim(),
@@ -507,11 +507,11 @@ function saveSettings(){
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
 function exportBackup(){
   const payload={version:5,exportedAt:new Date().toISOString(),data};
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));a.download=`finova-backup-${today}.json`;a.click();URL.revokeObjectURL(a.href);toast("Backup exported");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));a.download=`mithra-finance-system-backup-${today}.json`;a.click();URL.revokeObjectURL(a.href);toast("Backup exported");
 }
 function importBackup(){
   const input=document.createElement("input");input.type="file";input.accept=".json,application/json";
-  input.onchange=()=>{const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);const d=p.data||p;if(!d.customers||!d.loans||!d.payments)throw new Error("Invalid FINOVA backup");data=d;data.settings=(data.settings&&typeof data.settings==="object")?data.settings:{};saveData();toast("Backup restored");appSettings()}catch(e){toast("Invalid backup file")}};r.readAsText(f)};input.click();
+  input.onchange=()=>{const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);const d=p.data||p;if(!d.customers||!d.loans||!d.payments)throw new Error("Invalid Mithra Finance System backup");data=d;data.settings=(data.settings&&typeof data.settings==="object")?data.settings:{};saveData();toast("Backup restored");appSettings()}catch(e){toast("Invalid backup file")}};r.readAsText(f)};input.click();
 }
 function resetDemoConfirm(){
   styledConfirm("Reset Demo Data", "All local demo data will be removed. This action cannot be undone.", ()=>{localStorage.removeItem(KEY);localStorage.removeItem(SETTINGS_KEY);location.reload();});
@@ -630,7 +630,7 @@ function loanSchedule(id){
 }
 function loanStatement(id){
   const l=data.loans.find(x=>x.id===id),c=getCustomer(l.customerId),ps=data.payments.filter(p=>p.loanId===id).sort((a,b)=>a.date.localeCompare(b.date));
-  openModal("Loan Statement",`<div class="statement"><div class="statement-head"><div><h2>FINOVA FINANCE</h2><span>Loan Statement</span></div><b>${today}</b></div><div class="statement-customer"><b>${c?.name||""}</b><span>${l.id} · ${c?.mobile||""}</span></div><div class="kpis"><div class="kpi"><span>Principal</span><b>${money(l.amount)}</b></div><div class="kpi"><span>Interest</span><b>${money(l.interest||0)}</b></div><div class="kpi"><span>Outstanding</span><b>${money(l.balance)}</b></div></div><h3>Payment History</h3>${ps.length?`<table class="table"><thead><tr><th>Date</th><th>Receipt</th><th>Amount</th><th>Mode</th></tr></thead><tbody>${ps.map(p=>`<tr><td>${p.date}</td><td>${p.id}</td><td>${money(p.amount)}</td><td>${p.mode}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No payments</div>`}</div><div class="form-actions"><button class="btn light" onclick="printLoanStatement('${id}')">Print / PDF</button></div>`);
+  openModal("Loan Statement",`<div class="statement"><div class="statement-head"><div><h2>Mithra Finance System</h2><span>Loan Statement</span></div><b>${today}</b></div><div class="statement-customer"><b>${c?.name||""}</b><span>${l.id} · ${c?.mobile||""}</span></div><div class="kpis"><div class="kpi"><span>Principal</span><b>${money(l.amount)}</b></div><div class="kpi"><span>Interest</span><b>${money(l.interest||0)}</b></div><div class="kpi"><span>Outstanding</span><b>${money(l.balance)}</b></div></div><h3>Payment History</h3>${ps.length?`<table class="table"><thead><tr><th>Date</th><th>Receipt</th><th>Amount</th><th>Mode</th></tr></thead><tbody>${ps.map(p=>`<tr><td>${p.date}</td><td>${p.id}</td><td>${money(p.amount)}</td><td>${p.mode}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No payments</div>`}</div><div class="form-actions"><button class="btn light" onclick="printLoanStatement('${id}')">Print / PDF</button></div>`);
 }
 function printLoanStatement(id){
   const body=document.querySelector(".statement")?.outerHTML||"",w=window.open("","_blank");
@@ -638,7 +638,7 @@ function printLoanStatement(id){
 }
 function loanWhatsapp(id){
   const l=data.loans.find(x=>x.id===id),c=getCustomer(l.customerId);if(!c)return;
-  const text=encodeURIComponent(`Hello ${c.name}, this is FINOVA FINANCE. Your loan ${l.id} has an outstanding amount of ${money(l.balance)}. ${l.balance>0?`Your next due date is ${l.due}.`:"Thank you for completing your loan."}`);
+  const text=encodeURIComponent(`Hello ${c.name}, this is Mithra Finance System. Your loan ${l.id} has an outstanding amount of ${money(l.balance)}. ${l.balance>0?`Your next due date is ${l.due}.`:"Thank you for completing your loan."}`);
   window.open(`https://wa.me/${String(c.mobile||"").replace(/\D/g,"")}?text=${text}`,"_blank");
 }
 function editLoan(id){
@@ -674,9 +674,9 @@ function collectPayment(e,loanId){
 function receipt(id){
   let p=data.payments.find(x=>x.id===id),c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);
   const previous=(l?.balance||0)+p.amount;
-  const msg=encodeURIComponent(`FINOVA FINANCE Payment Receipt%0AReceipt: ${p.id}%0ACustomer: ${c.name}%0ALoan: ${l.id}%0APaid: ${money(p.amount)}%0ABalance: ${money(l.balance)}%0ADate: ${p.date}%0AMode: ${p.mode}`);
+  const msg=encodeURIComponent(`Mithra Finance System Payment Receipt%0AReceipt: ${p.id}%0ACustomer: ${c.name}%0ALoan: ${l.id}%0APaid: ${money(p.amount)}%0ABalance: ${money(l.balance)}%0ADate: ${p.date}%0AMode: ${p.mode}`);
   openModal("Payment Receipt",`<div id="printReceipt" class="receipt">
-    <div class="receipt-brand"><div class="logo">₹</div><div><h2>FINOVA FINANCE</h2><span>Official Payment Receipt</span></div></div>
+    <div class="receipt-brand"><div class="logo">₹</div><div><h2>Mithra Finance System</h2><span>Official Payment Receipt</span></div></div>
     <div class="receipt-grid"><div><span>Receipt No</span><b>${p.id}</b></div><div><span>Date</span><b>${p.date}</b></div><div><span>Customer</span><b>${c.name}</b></div><div><span>Loan No</span><b>${l.id}</b></div></div>
     <div class="receipt-amount"><span>Payment Received</span><strong>${money(p.amount)}</strong></div>
     <div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(l.balance)}</b></div><div><span>Payment Mode</span><b>${p.mode}</b></div><div><span>Reference</span><b>${p.ref||"-"}</b></div></div>
@@ -724,7 +724,7 @@ function activityHtml(c,ls,ps){
 function customerStatement(id){
   const c=getCustomer(id),ls=data.loans.filter(l=>l.customerId===id),ps=data.payments.filter(p=>p.customerId===id).sort((a,b)=>a.date.localeCompare(b.date));
   const paid=Math.max(0,(c.borrowed||0)-(c.balance||0));
-  const html=`<div class="statement"><div class="statement-head"><div><h2>FINOVA FINANCE</h2><span>Customer Statement</span></div><b>${today}</b></div><div class="statement-customer"><b>${c.name}</b><span>${c.id} · ${c.mobile}</span></div><div class="kpis"><div class="kpi"><span>Total Borrowed</span><b>${money(c.borrowed)}</b></div><div class="kpi"><span>Total Paid</span><b>${money(paid)}</b></div><div class="kpi"><span>Outstanding</span><b>${money(c.balance)}</b></div></div><h3>Loans</h3>${loanTable(ls)}<h3 style="margin-top:18px">Payments</h3>${ps.length?`<table class="table"><thead><tr><th>Date</th><th>Receipt</th><th>Amount</th><th>Mode</th></tr></thead><tbody>${ps.map(p=>`<tr><td>${p.date}</td><td>${p.id}</td><td>${money(p.amount)}</td><td>${p.mode}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No payments</div>`}</div><div class="form-actions"><button class="btn light" onclick="printStatement('${id}')">Print / PDF</button></div>`;
+  const html=`<div class="statement"><div class="statement-head"><div><h2>Mithra Finance System</h2><span>Customer Statement</span></div><b>${today}</b></div><div class="statement-customer"><b>${c.name}</b><span>${c.id} · ${c.mobile}</span></div><div class="kpis"><div class="kpi"><span>Total Borrowed</span><b>${money(c.borrowed)}</b></div><div class="kpi"><span>Total Paid</span><b>${money(paid)}</b></div><div class="kpi"><span>Outstanding</span><b>${money(c.balance)}</b></div></div><h3>Loans</h3>${loanTable(ls)}<h3 style="margin-top:18px">Payments</h3>${ps.length?`<table class="table"><thead><tr><th>Date</th><th>Receipt</th><th>Amount</th><th>Mode</th></tr></thead><tbody>${ps.map(p=>`<tr><td>${p.date}</td><td>${p.id}</td><td>${money(p.amount)}</td><td>${p.mode}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No payments</div>`}</div><div class="form-actions"><button class="btn light" onclick="printStatement('${id}')">Print / PDF</button></div>`;
   openModal("Customer Statement",html);
 }
 function printStatement(id){
@@ -734,21 +734,21 @@ function printStatement(id){
 }
 function whatsappCustomer(id){
   const c=getCustomer(id),l=data.loans.find(x=>x.customerId===id&&x.balance>0);
-  const text=encodeURIComponent(`Hello ${c.name}, this is FINOVA FINANCE. Your current outstanding amount is ${money(c.balance)}${l?`. Your loan ${l.id} due amount is ${money(Math.min(l.balance,5000))} on ${l.due}.`:"."}`);
+  const text=encodeURIComponent(`Hello ${c.name}, this is Mithra Finance System. Your current outstanding amount is ${money(c.balance)}${l?`. Your loan ${l.id} due amount is ${money(Math.min(l.balance,5000))} on ${l.due}.`:"."}`);
   window.open(`https://wa.me/${String(c.mobile||"").replace(/\D/g,"")}?text=${text}`,"_blank");
 }
 function openModal(t,b){document.getElementById("modalTitle").textContent=t;document.getElementById("modalBody").innerHTML=b;document.getElementById("modal").classList.remove("hidden")}
 function closeModal(){document.getElementById("modal").classList.add("hidden")}
 function styledConfirm(title,message,onYes){openModal(title,`<div class="confirm-dialog"><div class="confirm-icon">!</div><p class="confirm-message">${esc(message)}</p><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button type="button" class="btn red" id="confirmAction">Confirm</button></div></div>`);document.getElementById("confirmAction")?.addEventListener("click",()=>{closeModal();onYes?.()},{once:true})}
 function styledPrompt(title,message,value,onDone){openModal(title,`<div class="prompt-dialog"><p class="prompt-message">${esc(message)}</p><div class="field"><label>Value</label><input id="styledPromptValue" value="${esc(value??"")}" autocomplete="off"></div><div class="form-actions"><button type="button" class="btn light" id="promptCancel">Cancel</button><button type="button" class="btn green" id="promptAction">Save</button></div></div>`);const input=document.getElementById("styledPromptValue");input?.focus();document.getElementById("promptCancel")?.addEventListener("click",()=>{closeModal();onDone(null)},{once:true});document.getElementById("promptAction")?.addEventListener("click",()=>{const v=input?.value??"";closeModal();onDone(v)},{once:true})}
-function printCurrentModal(){const card=document.querySelector('#modal .modal-card');if(!card)return;const w=window.open('','_blank','width=900,height=700');if(!w)return;w.document.write('<html><head><title>FINOVA Report</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#152036}.report-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.report-summary-grid div{border:1px solid #e5eaf1;border-radius:12px;padding:16px}.report-summary-grid span{display:block;color:#7b889b;font-size:12px}.report-summary-grid b{display:block;font-size:20px;margin-top:6px}</style></head><body>'+card.innerHTML+'</body></html>');w.document.close();w.focus();w.print()}
+function printCurrentModal(){const card=document.querySelector('#modal .modal-card');if(!card)return;const w=window.open('','_blank','width=900,height=700');if(!w)return;w.document.write('<html><head><title>Mithra Finance System Report</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#152036}.report-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.report-summary-grid div{border:1px solid #e5eaf1;border-radius:12px;padding:16px}.report-summary-grid span{display:block;color:#7b889b;font-size:12px}.report-summary-grid b{display:block;font-size:20px;margin-top:6px}</style></head><body>'+card.innerHTML+'</body></html>');w.document.close();w.focus();w.print()}
 function toast(t){let x=document.createElement("div");x.className="toast";x.innerHTML='<span class="toast-dot">✓</span><span>'+esc(t)+'</span>';document.body.appendChild(x);setTimeout(()=>x.remove(),2200)}
-function exportData(){let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="finova-v2-backup.json";a.click()}
+function exportData(){let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="mithra-finance-system-v2-backup.json";a.click()}
 function resetData(){if(confirm("Reset demo data?")){localStorage.removeItem(KEY);location.reload()}}
-try{render("dashboard")}catch(err){console.error(err);document.getElementById("page").innerHTML=`<div class="card error-card"><h2>FINOVA could not load</h2><p>Saved data was incompatible. Reset the demo data and reload.</p><button class="btn green" onclick="resetData()">Reset Demo Data</button><button class="btn light" onclick="location.reload()">Reload</button><pre>${String(err.message||err)}</pre></div>`}
+try{render("dashboard")}catch(err){console.error(err);document.getElementById("page").innerHTML=`<div class="card error-card"><h2>Mithra Finance System could not load</h2><p>Saved data was incompatible. Reset the demo data and reload.</p><button class="btn green" onclick="resetData()">Reset Demo Data</button><button class="btn light" onclick="location.reload()">Reload</button><pre>${String(err.message||err)}</pre></div>`}
 function resetData(){localStorage.removeItem(KEY);location.reload()}
 
-/* FINOVA V7 - Customer 360 + Loan Detail enhancements */
+/* Mithra Finance System V7 - Customer 360 + Loan Detail enhancements */
 function customerDetail(id){
   const c=getCustomer(id); if(!c)return;
   const ls=data.loans.filter(l=>l.customerId===id);
@@ -790,13 +790,13 @@ function buildV7Schedule(l){
   return `<div class="table-scroll"><table class="table"><thead><tr><th>#</th><th>Due Date</th><th>Installment</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
-// FINOVA V9 sidebar polish: desktop collapse, mobile menu remains unchanged.
+// Mithra Finance System V9 sidebar polish: desktop collapse, mobile menu remains unchanged.
 document.addEventListener('DOMContentLoaded',()=>{
   const sb=document.querySelector('.sidebar'), btn=document.getElementById('sidebarCollapse');
   if(btn&&sb){btn.addEventListener('click',()=>{if(window.innerWidth>760){sb.classList.toggle('is-collapsed');btn.textContent=sb.classList.contains('is-collapsed')?'›':'‹';localStorage.setItem('finovaSidebarCollapsed',sb.classList.contains('is-collapsed')?'1':'0');}});if(window.innerWidth>760&&localStorage.getItem('finovaSidebarCollapsed')==='1'){sb.classList.add('is-collapsed');btn.textContent='›';}}
 });
 
-// FINOVA V10: working notification + admin dropdown menus.
+// Mithra Finance System V10: working notification + admin dropdown menus.
 function closeTopMenus(){
   ['notificationMenu','profileMenu'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
   document.getElementById('notificationBtn')?.setAttribute('aria-expanded','false');
@@ -824,11 +824,11 @@ function clearNotifications(){
 function showProfileInfo(){
   closeTopMenus();
   const s=data.settings||{};
-  openModal('Admin Profile',`<div class="profile-info"><div class="avatar big">A</div><div><h2 style="margin:0">${escx(s.ownerName||'Admin')}</h2><p class="muted">Finance Manager</p><div class="detail-list"><span>Business <b>${escx(s.businessName||'FINOVA Finance')}</b></span><span>Mobile <b>${escx(s.mobile||'-')}</b></span></div></div></div>`);
+  openModal('Admin Profile',`<div class="profile-info"><div class="avatar big">A</div><div><h2 style="margin:0">${escx(s.ownerName||'Admin')}</h2><p class="muted">Finance Manager</p><div class="detail-list"><span>Business <b>${escx(s.businessName||'Mithra Finance System')}</b></span><span>Mobile <b>${escx(s.mobile||'-')}</b></span></div></div></div>`);
 }
 function appLogout(){
   closeTopMenus();
-  styledConfirm('Logout', 'Do you want to logout from FINOVA on this device?', ()=>toast('Logged out'));
+  styledConfirm('Logout', 'Do you want to logout from Mithra Finance System on this device?', ()=>toast('Logged out'));
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -840,7 +840,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 /* =========================================================
-   FINOVA PROFESSIONAL PACK
+   Mithra Finance System PROFESSIONAL PACK
    Functionality-only upgrade. Existing visual structure is preserved.
    ========================================================= */
 (function(){
@@ -895,11 +895,11 @@ function escapeCsv(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
 function downloadTextFile(name,text,type='text/plain'){const blob=new Blob([text],{type}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
 function exportProfessionalCSV(kind){
   if(!guard(['Admin','Manager','Viewer']))return;
-  let rows=[],name='finova-export.csv';
-  if(kind==='customers'){rows=[['ID','Name','Mobile','Area','Occupation','Borrowed','Outstanding','Follow-up Status'],...data.customers.map(c=>[c.id,c.name,c.mobile,c.area,c.occupation,c.borrowed,c.balance,c.followUpStatus])];name='finova-customers.csv';}
-  if(kind==='loans'){rows=[['Loan ID','Customer','Principal','Interest','Total','Paid','Outstanding','Due','Frequency','Status'],...data.loans.map(l=>[l.id,getCustomer(l.customerId)?.name||'',l.amount,l.interest,loanTotal(l),paidForLoan(l),l.balance,l.due,l.frequency,l.balance<=0?'Closed':l.status])];name='finova-loans.csv';}
-  if(kind==='payments'){rows=[['Receipt','Date','Customer','Loan','Amount','Mode','Reference','Notes'],...data.payments.map(p=>[p.id,p.date,getCustomer(p.customerId)?.name||'',p.loanId,p.amount,p.mode,p.ref,p.notes])];name='finova-payments.csv';}
-  if(kind==='audit'){rows=[['Timestamp','User','Role','Action','Entity','Entity ID','Details'],...data.auditLog.map(a=>[a.timestamp,a.user,a.role,a.action,a.entity,a.entityId,a.details])];name='finova-audit-log.csv';}
+  let rows=[],name='mithra-finance-system-export.csv';
+  if(kind==='customers'){rows=[['ID','Name','Mobile','Area','Occupation','Borrowed','Outstanding','Follow-up Status'],...data.customers.map(c=>[c.id,c.name,c.mobile,c.area,c.occupation,c.borrowed,c.balance,c.followUpStatus])];name='mithra-finance-system-customers.csv';}
+  if(kind==='loans'){rows=[['Loan ID','Customer','Principal','Interest','Total','Paid','Outstanding','Due','Frequency','Status'],...data.loans.map(l=>[l.id,getCustomer(l.customerId)?.name||'',l.amount,l.interest,loanTotal(l),paidForLoan(l),l.balance,l.due,l.frequency,l.balance<=0?'Closed':l.status])];name='mithra-finance-system-loans.csv';}
+  if(kind==='payments'){rows=[['Receipt','Date','Customer','Loan','Amount','Mode','Reference','Notes'],...data.payments.map(p=>[p.id,p.date,getCustomer(p.customerId)?.name||'',p.loanId,p.amount,p.mode,p.ref,p.notes])];name='mithra-finance-system-payments.csv';}
+  if(kind==='audit'){rows=[['Timestamp','User','Role','Action','Entity','Entity ID','Details'],...data.auditLog.map(a=>[a.timestamp,a.user,a.role,a.action,a.entity,a.entityId,a.details])];name='mithra-finance-system-audit-log.csv';}
   downloadTextFile(name,rows.map(r=>r.map(escapeCsv).join(',')).join('\n'),'text/csv');toast('CSV exported');
 }
 
@@ -967,8 +967,8 @@ openPayment=function(loanId){ if(!loanId){ openCollectionPicker(); return; } ret
 function receiptPro(id){
   const p=data.payments.find(x=>x.id===id);if(!p)return;const c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);if(!c||!l)return;
   const previous=Number(p.previousBalance??(Number(l.balance||0)+Number(p.amount||0)));const after=Number(p.balanceAfter??l.balance);
-  const msg=encodeURIComponent(`FINOVA FINANCE Payment Receipt\nReceipt: ${p.id}\nCustomer: ${c.name}\nLoan: ${l.id}\nPaid: ${money(p.amount)}\nBalance: ${money(after)}\nDate: ${p.date}\nMode: ${p.mode}${p.ref?'\nReference: '+p.ref:''}`);
-  openModal('Payment Receipt',`<div id="printReceipt" class="receipt"><div class="receipt-brand"><div class="logo">₹</div><div><h2>${esc(data.settings?.businessName||'FINOVA FINANCE')}</h2><span>Official Payment Receipt</span></div></div><div class="receipt-grid"><div><span>Receipt No</span><b>${esc(p.id)}</b></div><div><span>Date / Time</span><b>${esc(p.date||'-')} ${esc(p.time||'')}</b></div><div><span>Customer</span><b>${esc(c.name)}</b></div><div><span>Loan No</span><b>${esc(l.id)}</b></div></div><div class="receipt-amount"><span>Payment Received</span><strong>${money(p.amount)}</strong></div><div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(after)}</b></div><div><span>Payment Mode</span><b>${esc(p.mode||'-')}</b></div><div><span>Reference</span><b>${esc(p.ref||'-')}</b></div></div>${p.notes?`<div class="receipt-note"><b>Notes:</b> ${esc(p.notes)}</div>`:''}<div class="receipt-note">Thank you for your payment. Please keep this receipt for your records.</div></div><div class="form-actions"><button class="btn light" onclick="printReceipt('${id}')">Print / PDF</button><button class="btn green" onclick="window.open('https://wa.me/${String(c.mobile||'').replace(/\D/g,'')}?text=${msg}','_blank')">WhatsApp</button></div>`);
+  const msg=encodeURIComponent(`Mithra Finance System Payment Receipt\nReceipt: ${p.id}\nCustomer: ${c.name}\nLoan: ${l.id}\nPaid: ${money(p.amount)}\nBalance: ${money(after)}\nDate: ${p.date}\nMode: ${p.mode}${p.ref?'\nReference: '+p.ref:''}`);
+  openModal('Payment Receipt',`<div id="printReceipt" class="receipt"><div class="receipt-brand"><div class="logo">₹</div><div><h2>${esc(data.settings?.businessName||'Mithra Finance System')}</h2><span>Official Payment Receipt</span></div></div><div class="receipt-grid"><div><span>Receipt No</span><b>${esc(p.id)}</b></div><div><span>Date / Time</span><b>${esc(p.date||'-')} ${esc(p.time||'')}</b></div><div><span>Customer</span><b>${esc(c.name)}</b></div><div><span>Loan No</span><b>${esc(l.id)}</b></div></div><div class="receipt-amount"><span>Payment Received</span><strong>${money(p.amount)}</strong></div><div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(after)}</b></div><div><span>Payment Mode</span><b>${esc(p.mode||'-')}</b></div><div><span>Reference</span><b>${esc(p.ref||'-')}</b></div></div>${p.notes?`<div class="receipt-note"><b>Notes:</b> ${esc(p.notes)}</div>`:''}<div class="receipt-note">Thank you for your payment. Please keep this receipt for your records.</div></div><div class="form-actions"><button class="btn light" onclick="printReceipt('${id}')">Print / PDF</button><button class="btn green" onclick="window.open('https://wa.me/${String(c.mobile||'').replace(/\D/g,'')}?text=${msg}','_blank')">WhatsApp</button></div>`);
 }
 receipt=receiptPro;
 
@@ -997,7 +997,7 @@ function appSettingsPro(){
   const s=data.settings||{};
   page.innerHTML=title('Settings','Business profile, finance defaults, security and professional controls',`<button class="btn" onclick="exportBackup()">Backup Data</button><button class="btn green" onclick="importBackup()">Restore Data</button>`)+
   `<div class="settings-grid">
-  <div class="section"><div class="section-head"><div><h3>Business Profile</h3><p class="muted">Shown on receipts and reports</p></div></div><div class="form-grid settings-form"><label>Business Name<input id="setBusinessName" value="${esc(s.businessName||'FINOVA Finance')}"></label><label>Owner / Admin Name<input id="setOwnerName" value="${esc(s.ownerName||'Admin')}"></label><label>Mobile Number<input id="setMobile" value="${esc(s.mobile||'')}"></label><label>Address<input id="setAddress" value="${esc(s.address||'')}"></label><label>Receipt Prefix<input id="setReceiptPrefix" value="${esc(s.receiptPrefix||'RC')}"></label><label>Currency<select id="setCurrency"><option ${s.currency==='INR'||!s.currency?'selected':''}>INR</option><option ${s.currency==='USD'?'selected':''}>USD</option></select></label></div></div>
+  <div class="section"><div class="section-head"><div><h3>Business Profile</h3><p class="muted">Shown on receipts and reports</p></div></div><div class="form-grid settings-form"><label>Business Name<input id="setBusinessName" value="${esc(s.businessName||'Mithra Finance System')}"></label><label>Owner / Admin Name<input id="setOwnerName" value="${esc(s.ownerName||'Admin')}"></label><label>Mobile Number<input id="setMobile" value="${esc(s.mobile||'')}"></label><label>Address<input id="setAddress" value="${esc(s.address||'')}"></label><label>Receipt Prefix<input id="setReceiptPrefix" value="${esc(s.receiptPrefix||'RC')}"></label><label>Currency<select id="setCurrency"><option ${s.currency==='INR'||!s.currency?'selected':''}>INR</option><option ${s.currency==='USD'?'selected':''}>USD</option></select></label></div></div>
   <div class="section"><div class="section-head"><div><h3>Loan Defaults</h3><p class="muted">Used for new loans</p></div></div><div class="form-grid settings-form"><label>Default Interest %<input id="setInterest" type="number" step="0.01" value="${Number(s.defaultInterest||10)}"></label><label>Interest Type<select id="setInterestType"><option ${s.interestType==='Flat'||!s.interestType?'selected':''}>Flat</option><option ${s.interestType==='Reducing'?'selected':''}>Reducing</option></select></label><label>Default Frequency<select id="setFrequency"><option ${s.frequency==='Monthly'||!s.frequency?'selected':''}>Monthly</option><option ${s.frequency==='Weekly'?'selected':''}>Weekly</option><option ${s.frequency==='Daily'?'selected':''}>Daily</option></select></label><label>Opening Cash<input id="setOpeningCash" type="number" value="${Number(s.openingCash||50000)}"></label><label>Grace Period (days)<input id="setGrace" type="number" value="${Number(s.graceDays||0)}"></label></div></div>
   <div class="section"><div class="section-head"><div><h3>Roles & Permissions</h3><p class="muted">Local role controls for this device</p></div></div><div class="form-grid settings-form"><label>Current Role<select id="setRole"><option ${s.role==='Admin'?'selected':''}>Admin</option><option ${s.role==='Manager'?'selected':''}>Manager</option><option ${s.role==='Collector'?'selected':''}>Collector</option><option ${s.role==='Viewer'?'selected':''}>Viewer</option></select></label><label>Session User<input id="setUserName" value="${esc(s.ownerName||'Admin')}"></label></div><div class="settings-note">Admin: full access · Manager: finance and reports · Collector: collection and follow-up · Viewer: read-only reports.</div></div>
   <div class="section"><div class="section-head"><div><h3>Receipt & Collection</h3><p class="muted">Payment behavior</p></div></div><div class="settings-options"><label class="toggle-row"><span><b>Allow Partial Payments</b><small>Accept less than installment</small></span><input id="setPartial" type="checkbox" ${s.partialPayments!==false?'checked':''}></label><label class="toggle-row"><span><b>Show Balance on Receipt</b><small>Print remaining balance</small></span><input id="setReceiptBalance" type="checkbox" ${s.receiptBalance!==false?'checked':''}></label><label class="toggle-row"><span><b>Due Reminder</b><small>Highlight due and overdue accounts</small></span><input id="setReminder" type="checkbox" ${s.dueReminder!==false?'checked':''}></label></div></div>
@@ -1007,7 +1007,7 @@ function appSettingsPro(){
 }
 function saveSettingsPro(){
   data.settings=data.settings||{};const oldRole=data.settings.role;
-  Object.assign(data.settings,{businessName:document.getElementById('setBusinessName').value.trim()||'FINOVA Finance',ownerName:document.getElementById('setOwnerName').value.trim()||'Admin',mobile:document.getElementById('setMobile').value.trim(),address:document.getElementById('setAddress').value.trim(),receiptPrefix:document.getElementById('setReceiptPrefix').value.trim()||'RC',currency:document.getElementById('setCurrency').value,defaultInterest:Number(document.getElementById('setInterest').value||0),interestType:document.getElementById('setInterestType').value,frequency:document.getElementById('setFrequency').value,openingCash:Number(document.getElementById('setOpeningCash').value||0),graceDays:Number(document.getElementById('setGrace').value||0),role:document.getElementById('setRole').value,partialPayments:document.getElementById('setPartial').checked,receiptBalance:document.getElementById('setReceiptBalance').checked,dueReminder:document.getElementById('setReminder').checked});
+  Object.assign(data.settings,{businessName:document.getElementById('setBusinessName').value.trim()||'Mithra Finance System',ownerName:document.getElementById('setOwnerName').value.trim()||'Admin',mobile:document.getElementById('setMobile').value.trim(),address:document.getElementById('setAddress').value.trim(),receiptPrefix:document.getElementById('setReceiptPrefix').value.trim()||'RC',currency:document.getElementById('setCurrency').value,defaultInterest:Number(document.getElementById('setInterest').value||0),interestType:document.getElementById('setInterestType').value,frequency:document.getElementById('setFrequency').value,openingCash:Number(document.getElementById('setOpeningCash').value||0),graceDays:Number(document.getElementById('setGrace').value||0),role:document.getElementById('setRole').value,partialPayments:document.getElementById('setPartial').checked,receiptBalance:document.getElementById('setReceiptBalance').checked,dueReminder:document.getElementById('setReminder').checked});
   save();audit('Settings updated','System','settings',`Role ${oldRole||'Admin'} → ${data.settings.role}`);toast('✓ Settings saved successfully');setTimeout(()=>appSettingsPro(),250);
 }
 appSettings=appSettingsPro;
@@ -1052,9 +1052,9 @@ addExpense=function(e){if(!guard(['Admin','Manager']))return;e.preventDefault();
 
 /* Existing exports remain available; this adds an auditable professional backup. */
 const _exportBackupOriginal=exportBackup;
-exportBackup=function(){try{data.meta={...(data.meta||{}),exportedAt:profNow(),version:'FINOVA Professional'};audit('Backup exported','System','backup','Local JSON backup');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finova-professional-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}catch(e){toast('Backup failed');}};
+exportBackup=function(){try{data.meta={...(data.meta||{}),exportedAt:profNow(),version:'Mithra Finance System Professional'};audit('Backup exported','System','backup','Local JSON backup');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mithra-finance-system-professional-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}catch(e){toast('Backup failed');}};
 
-/* FINOVA Professional+ Pack — additive functionality; existing navigation/design preserved. */
+/* Mithra Finance System Professional+ Pack — additive functionality; existing navigation/design preserved. */
 (function(){
   data.followUps=data.followUps||[]; data.auditLog=data.auditLog||[]; data.cashClosings=data.cashClosings||[];
   data.pdc=data.pdc||[]; data.guarantors=data.guarantors||[]; data.documents=data.documents||[]; data.recycleBin=data.recycleBin||[];
@@ -1113,7 +1113,7 @@ function recycleManager(){openModal('Recycle Bin',`<div class="section-head"><h3
 function restoreRecycle(id){const x=data.recycleBin.find(r=>r.recycleId===id);if(!x)return;data[x.type+'s']=data[x.type+'s']||[];data[x.type+'s'].push(x.record);data.recycleBin=data.recycleBin.filter(r=>r.recycleId!==id);save();audit('Record restored','Recycle Bin',id,x.type);toast('Record restored');recycleManager()}
 function emptyRecycleBin(){if(!guard(['Admin']))return;styledConfirm('Empty Recycle Bin','All deleted records will be permanently removed.',()=>{data.recycleBin=[];save();audit('Recycle bin emptied','System','recycle','All deleted records removed');recycleManager()})}
 function systemHealth(){const raw=JSON.stringify(data), bytes=new Blob([raw]).size, lastBackup=data.meta?.exportedAt||'Never', integrity=data.customers.every(c=>c.id&&c.name)&&data.loans.every(l=>l.id&&l.customerId&&Number.isFinite(Number(l.balance)));openModal('System Health',`<div class="detail-list"><span>Data integrity <b>${integrity?'OK':'Needs review'}</b></span><span>Customers <b>${data.customers.length}</b></span><span>Loans <b>${data.loans.length}</b></span><span>Payments <b>${data.payments.length}</b></span><span>Expenses <b>${data.expenses.length}</b></span><span>Storage <b>${(bytes/1024).toFixed(1)} KB</b></span><span>Last backup <b>${esc(lastBackup)}</b></span><span>Branch count <b>${data.branches.length}</b></span></div>`)}
-function exportProfessionalPlus(){data.meta={...(data.meta||{}),exportedAt:profNow(),version:'FINOVA Professional+'};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finova-professional-plus-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);toast('Professional+ backup exported')}
+function exportProfessionalPlus(){data.meta={...(data.meta||{}),exportedAt:profNow(),version:'Mithra Finance System Professional+'};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mithra-finance-system-professional-plus-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);toast('Professional+ backup exported')}
 
 /* Additive access point in Settings only; no navigation or visual redesign. */
 const _settingsPlus=appSettings;
