@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mithra Finance System — Finance Manager V2</title><link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="assets/finova-v13-workflow.css"></head>
+</head>
 <body>
 <div class="app">
 <aside class="sidebar">
@@ -50,4 +50,26 @@
 </main></div>
 <div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3 id="modalTitle"></h3><button onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
 <script src="app.js"></script>
-<script src="assets/finova-v13-workflow.js"></script></body></html>
+
+<script>
+/* Mithra resilient boot guard — does not alter existing data or page design. */
+(function(){
+  function bootCheck(){
+    var p=document.getElementById('page');
+    if(!p) return;
+    if(!p.innerHTML || !p.innerHTML.trim()){
+      try{
+        if(typeof window.render==='function'){
+          window.render('dashboard');
+        }
+      }catch(err){
+        p.innerHTML='<div class="card error-card"><h2>Mithra Finance System could not load</h2><p>The dashboard hit a runtime error. Reload the page once.</p><pre style="white-space:pre-wrap;overflow:auto">'+String(err&&err.message||err)+'</pre><button class="btn green" onclick="location.reload()">Reload</button></div>';
+        console.error('Mithra boot error:',err);
+      }
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(bootCheck,80);});
+  else setTimeout(bootCheck,80);
+})();
+</script>
+</body></html>
