@@ -1908,7 +1908,7 @@ window.professionalCenter=professionalCenter;
     const v=data.mithraControl.savedViews[i];if(!v)return;
     const search=[...document.querySelectorAll('input[type="search"],input[placeholder*="Search"]')].find(x=>x.offsetParent!==null);
     if(search&&v.query){search.value=v.query;search.dispatchEvent(new Event('input',{bubbles:true}));}
-    [...document.querySelectorAll('select')].forEach((s,j)=>{if(v.filters?.[j]!==undefined){s.value=v.filters[j];s.dispatchEvent(new Event('change',{bubbles:true));}});
+    [...document.querySelectorAll('select')].forEach((s,j)=>{if(v.filters?.[j]!==undefined){s.value=v.filters[j];s.dispatchEvent(new Event('change',{bubbles:true}));}});
     toast('View applied');closeModal();
   };
   window.mithraDeleteView=function(i){data.mithraControl.savedViews.splice(i,1);save();mithraSavedViews();};
