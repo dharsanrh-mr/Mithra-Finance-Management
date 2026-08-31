@@ -26,20 +26,8 @@ data.settings=(data.settings&&typeof data.settings==="object")?data.settings:{};
 if(separateSettings&&typeof separateSettings==="object") data.settings={...data.settings,...separateSettings};
 if(!Number.isFinite(Number(data.settings.openingCash))) data.settings.openingCash=50000;
 data.customers.forEach(c=>{c.borrowed=Number(c.borrowed||0);c.balance=Number(c.balance||0)});
-data.loans.forEach(l=>{l.amount=Number(l.amount||0);l.interest=Number(l.interest||0);l.balance=Number(l.balance??((l.amount||0)+(l.interest||0)));l.status=l.balance<=0?"Closed":(l.status||"Active");l.payments=Array.isArray(l.payments)?l.payments:[];l.followUp=(l.followUp&&typeof l.followUp==="object")?l.followUp:{};l.followUp.status=l.followUp.status||"Pending";l.followUp.nextDate=l.followUp.nextDate||""});
+data.loans.forEach(l=>{l.amount=Number(l.amount||0);l.interest=Number(l.interest||0);l.balance=Number(l.balance??((l.amount||0)+(l.interest||0)));l.status=l.balance<=0?"Closed":(l.status||"Active");l.payments=Array.isArray(l.payments)?l.payments:[]});
 const money=n=>"₹"+Number(n||0).toLocaleString("en-IN");
-const isDueToday=l=>Number(l?.balance||0)>0&&l?.due===today;
-const isOverdue=l=>Number(l?.balance||0)>0&&(l?.status==="Overdue"||l?.due<today);
-const dueTarget=l=>Math.min(Number(l?.balance||0),Number(l?.installment||5000));
-const todayDueLoans=()=>data.loans.filter(isDueToday);
-const todayDueAmount=()=>todayDueLoans().reduce((s,l)=>s+dueTarget(l),0);
-const currentMonthLoans=()=>data.loans.filter(l=>(l.createdAt||l.start||"").slice(0,7)===today.slice(0,7));
-const followUpDue=l=>Number(l?.balance||0)>0&&l?.followUp?.nextDate&&l.followUp.nextDate<=today&&l.followUp.status!=="Done";
-const followUpCount=()=>data.loans.filter(followUpDue).length;
-const nextReceiptId=()=>{const prefix=(data.settings?.receiptPrefix||"RC").toUpperCase();const nums=data.payments.map(p=>{const m=String(p.id||"").match(/(\d+)$/);return m?Number(m[1]):0});return prefix+"-"+String(Math.max(0,...nums)+1).padStart(5,"0")};
-
-const paymentModeTotals=()=>{const out={cash:0,upi:0,bank:0};data.payments.forEach(p=>{const m=(p.mode||"Cash").toLowerCase(),v=Number(p.amount||0);if(m==="cash")out.cash+=v;else if(m==="upi")out.upi+=v;else if(["bank","bank transfer","neft","rtgs","imps"].includes(m))out.bank+=v});return out};
-const cashPosition=()=>{const opening=Number(data.settings?.openingCash||0),mode=paymentModeTotals(),expenses=data.expenses.reduce((s,e)=>s+Number(e.amount||0),0);return Math.max(0,opening+mode.cash-expenses)};
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));localStorage.setItem(SETTINGS_KEY,JSON.stringify(data.settings||{}));};
 const saveData=save;
 const getCustomer=id=>data.customers.find(c=>c.id===id);const loanStatus=l=>l.status;
@@ -52,13 +40,13 @@ function render(p,q=""){
   const views={dashboard,customers,loans,collections,dues,cashbook,expenses,reports,settings:appSettings};
   (views[p]||dashboard)(q);
 }
-function dashboard(){let active=data.loans.filter(l=>l.balance>0).length,dis=data.loans.reduce((a,l)=>a+l.amount,0),out=data.loans.reduce((a,l)=>a+l.balance,0),col=data.payments.filter(p=>p.date===today).reduce((a,p)=>a+p.amount,0),over=data.loans.filter(isOverdue),due=todayDueLoans(),mode=paymentModeTotals();
+function dashboard(){let active=data.loans.filter(l=>l.status==="Active"||l.status==="Overdue").length,dis=data.loans.reduce((a,l)=>a+l.amount,0),out=data.loans.reduce((a,l)=>a+l.balance,0),col=data.payments.filter(p=>p.date===today).reduce((a,p)=>a+p.amount,0),over=data.loans.filter(l=>l.status==="Overdue"),due=data.loans.filter(l=>l.status==="Active");
 page.innerHTML=title("Dashboard","Complete finance overview for today",`<button class="btn green" onclick="openCustomer()">+ New Customer</button><button class="btn" onclick="openLoan()">+ New Loan</button><button class="btn light" onclick="openPayment()">Collect Payment</button>`)+
 `<div class="cards">
 <div class="card metric"><div><div class="label">Today's Collection</div><div class="value">${money(col)}</div><div class="sub">↑ Payments received</div></div><div class="metric-icon">↙</div></div>
-<div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(todayDueAmount())}</div><div class="sub">${due.length} loans due today</div></div><div class="metric-icon">◷</div></div>
+<div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(16500)}</div><div class="sub">Collection target</div></div><div class="metric-icon">◷</div></div>
 <div class="card metric"><div><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((a,l)=>a+l.balance,0))}</div><div class="sub" style="color:#d34d59">${over.length} customers need follow-up</div></div><div class="metric-icon">!</div></div>
-<div class="card metric"><div><div class="label">New Loans</div><div class="value">${currentMonthLoans().length}</div><div class="sub">This month</div></div><div class="metric-icon">▣</div></div>
+<div class="card metric"><div><div class="label">New Loans</div><div class="value">${data.loans.filter(l=>l.due===today).length}</div><div class="sub">This period</div></div><div class="metric-icon">▣</div></div>
 </div>
 <div class="cards" style="margin-top:14px">
 <div class="card"><div class="label">Active Customers</div><div class="value">${data.customers.length}</div></div>
@@ -68,8 +56,8 @@ page.innerHTML=title("Dashboard","Complete finance overview for today",`<button 
 </div>
 <div class="layout2"><div class="section"><div class="section-head"><h3>Collection Performance</h3><span class="muted">Daily · Last 6 months</span></div><div class="bars">${[52,68,45,75,61,88].map((h,i)=>`<div class="bar" style="height:${h}%"><span>${["Mar","Apr","May","Jun","Jul","Aug"][i]}</span></div>`).join("")}</div></div>
 <div class="section"><div class="section-head"><h3>Loan Portfolio</h3><span class="muted">Live status</span></div><div class="donut"></div><div class="legend"><span>● Active</span><span>● Due</span><span>● Overdue</span></div></div></div>
-<div class="layout2"><div class="section"><div class="section-head"><h3>🔴 Overdue Customers</h3><button class="btn light" onclick="render('dues')">View All</button></div>${over.map(l=>{let c=getCustomer(l.customerId);return `<div class="alert-box"><div><b>${c?.name||"Customer"}</b><small>${l.id} · ${Math.max(1,Math.ceil((Date.now()-new Date(l.due))/86400000))} days overdue</small></div><div style="text-align:right"><div class="amount-red">${money(l.balance)}</div><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button> <button class="mini-btn" onclick="openFollowUp('${l.id}')">Follow-up</button></div></div>`}).join("")||`<div class="empty">No overdue loans 🎉</div>`}</div>
-<div class="section"><div class="section-head"><h3>💰 Money Position</h3></div><div class="kpis"><div class="kpi"><span>Cash</span><b>${money(mode.cash)}</b></div><div class="kpi"><span>UPI</span><b>${money(mode.upi)}</b></div><div class="kpi"><span>Bank</span><b>${money(mode.bank)}</b></div></div><div class="kpi" style="margin-top:10px"><span>Total Available</span><b>${money(cashPosition()+mode.upi+mode.bank)}</b></div></div></div>
+<div class="layout2"><div class="section"><div class="section-head"><h3>🔴 Overdue Customers</h3><button class="btn light" onclick="render('dues')">View All</button></div>${over.map(l=>{let c=getCustomer(l.customerId);return `<div class="alert-box"><div><b>${c?.name||"Customer"}</b><small>${l.id} · ${Math.max(1,Math.ceil((Date.now()-new Date(l.due))/86400000))} days overdue</small></div><div style="text-align:right"><div class="amount-red">${money(l.balance)}</div><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button></div></div>`}).join("")||`<div class="empty">No overdue loans 🎉</div>`}</div>
+<div class="section"><div class="section-head"><h3>💰 Money Position</h3></div><div class="kpis"><div class="kpi"><span>Cash</span><b>${money(125000)}</b></div><div class="kpi"><span>UPI</span><b>${money(42500)}</b></div><div class="kpi"><span>Bank</span><b>${money(80000)}</b></div></div><div class="kpi" style="margin-top:10px"><span>Total Available</span><b>${money(247500)}</b></div></div></div>
 <div class="section" style="margin-top:17px"><div class="section-head"><h3>📅 Today's Due</h3><button class="btn light" onclick="render('dues')">View All</button></div>${due.map(l=>{let c=getCustomer(l.customerId);return `<div class="due-row"><div class="person"><div class="avatar">${c.name[0]}</div><div><b>${c?.name||"Customer"}</b><small>${l.id}</small></div></div><div>${money(Math.min(5000,l.balance))}</div><div>${l.due}</div><span class="status due">Due</span><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button></div>`}).join("")}</div>
 <div class="layout2"><div class="section"><div class="section-head"><h3>Recent Transactions</h3><button class="btn light" onclick="render('collections')">View All</button></div><div class="transactions">${data.payments.slice(-5).reverse().map(p=>{let c=getCustomer(p.customerId);return `<div class="txn"><div class="txn-left"><div class="txn-icon">↙</div><div><b>${c?.name||"Customer"} payment</b><small>${p.date} · ${p.mode}</small></div></div><span class="positive">+ ${money(p.amount)}</span></div>`}).join("")}</div></div>
 <div class="section"><div class="section-head"><h3>Recent Loans</h3><button class="btn light" onclick="render('loans')">View All</button></div>${loanTable(data.loans.slice().reverse().slice(0,4))}</div></div>`}
@@ -200,7 +188,7 @@ function loanQuickFilter(status){
   setTimeout(()=>{const e=document.getElementById("loanStatus");if(e){e.value=status;filterLoans();}},0);
 }
 function loanMenu(id){
-  openModal("Loan Actions",`<div class="quick-menu"><button onclick="loanDetail('${id}')">View Loan</button><button onclick="loanSchedule('${id}')">View Repayment Schedule</button><button onclick="openPayment('${id}')">Collect Payment</button><button onclick="loanStatement('${id}')">Print Loan Statement</button><button onclick="loanWhatsapp('${id}')">WhatsApp Reminder</button><button onclick="openFollowUp('${id}')">Follow-up</button><button onclick="editLoan('${id}')">Edit Loan</button></div>`);
+  openModal("Loan Actions",`<div class="quick-menu"><button onclick="loanDetail('${id}')">View Loan</button><button onclick="loanSchedule('${id}')">View Repayment Schedule</button><button onclick="openPayment('${id}')">Collect Payment</button><button onclick="loanStatement('${id}')">Print Loan Statement</button><button onclick="loanWhatsapp('${id}')">WhatsApp Reminder</button><button onclick="editLoan('${id}')">Edit Loan</button></div>`);
 }
 function paymentTable(){
   const ps=[...data.payments].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
@@ -214,7 +202,7 @@ function collections(){
   const todayTotal=data.payments.filter(p=>p.date===today).reduce((s,p)=>s+Number(p.amount||0),0);
   const total=data.payments.reduce((s,p)=>s+Number(p.amount||0),0);
   const avg=data.payments.length?total/data.payments.length:0;
-  page.innerHTML=title("Collections","Fast payment collection, receipts and payment history",`<button class="btn" onclick="exportCollectionsCsv()">Export CSV</button><button class="btn green" onclick="openCollectionPicker()">+ Collect Payment</button>`)+
+  page.innerHTML=title("Collections","Fast payment collection, receipts and payment history",`<button class="btn green" onclick="openCollectionPicker()">+ Collect Payment</button>`)+
   `<div class="cards">
     <div class="card metric"><div><div class="label">Today's Collection</div><div class="value">${money(todayTotal)}</div></div><div class="metric-icon">₹</div></div>
     <div class="card metric"><div><div class="label">Total Collected</div><div class="value">${money(total)}</div></div><div class="metric-icon">↗</div></div>
@@ -223,23 +211,11 @@ function collections(){
   </div>
   <div class="section" style="margin-top:17px">${paymentTable()}</div>`;
 }
-function exportCollectionsCsv(){
-  const rows=[['Receipt','Date','Customer','Loan','Amount','Mode','Reference','Notes','Balance After']];
-  [...data.payments].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(p=>{const c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);rows.push([p.id,p.date||'',c?.name||'',p.loanId||'',Number(p.amount||0),p.mode||'',p.ref||'',p.notes||'',Number(p.balanceAfter??l?.balance??0)]);});
-  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`finova-collections-${today}.csv`;a.click();URL.revokeObjectURL(a.href);toast('Collections CSV exported');
-}
 function openCollectionPicker(){
   const loans=data.loans.filter(l=>l.balance>0);
   openModal("Select Loan",`<div class="collection-picker">${loans.length?loans.map(l=>{const c=getCustomer(l.customerId);return `<button class="picker-row" onclick="openPayment('${l.id}')"><span><b>${c?.name||"Customer"}</b><small>${l.id} · Outstanding ${money(l.balance)}</small></span><strong>Collect</strong></button>`}).join(""):`<div class="empty">No active loan with outstanding balance</div>`}</div>`);
 }
-function dues(){let over=data.loans.filter(isOverdue),todayLoans=todayDueLoans(),up=data.loans.filter(l=>l.balance>0&&!isOverdue(l)&&l.due>today),fu=data.loans.filter(followUpDue);page.innerHTML=title("Due Management","Today's due, upcoming due and overdue follow-up",`<button class="btn green" onclick="openPayment()">Collect Payment</button>`)+`<div class="cards"><div class="card"><div class="label">Today's Due</div><div class="value">${money(todayDueAmount())}</div></div><div class="card"><div class="label">Upcoming Loans</div><div class="value">${up.length}</div></div><div class="card"><div class="label">Overdue</div><div class="value">${over.length}</div></div><div class="card"><div class="label">Follow-up Due</div><div class="value">${fu.length}</div></div></div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Overdue Follow-up</h3><span class="muted">${over.length} loans · ${money(over.reduce((a,l)=>a+l.balance,0))}</span></div>${followUpTable(over)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Follow-up Due Today</h3></div>${followUpTable(fu)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Today / Due</h3></div>${loanTable(todayLoans)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Upcoming</h3></div>${loanTable(up)}</div>`}
-function followUpTable(arr){if(!arr.length)return `<div class="empty">No follow-up items</div>`;return `<div class="table-scroll"><table class="table"><thead><tr><th>LOAN</th><th>CUSTOMER</th><th>OUTSTANDING</th><th>FOLLOW-UP</th><th>NEXT DATE</th><th>ACTIONS</th></tr></thead><tbody>${arr.map(l=>{const c=getCustomer(l.customerId),f=l.followUp||{};return `<tr><td><b>${l.id}</b><small>${l.due||"-"}</small></td><td><b>${c?.name||"Unknown"}</b><small>${c?.mobile||""}</small></td><td><b>${money(l.balance)}</b></td><td><span class="status ${String(f.status||"Pending").toLowerCase().replace(/ /g,"-")}">${f.status||"Pending"}</span>${f.notes?`<small>${escx(f.notes)}</small>`:""}</td><td>${f.nextDate||"Not set"}</td><td><div class="row-actions"><button class="mini-btn" onclick="openFollowUp('${l.id}')">Update</button><button class="mini-btn" onclick="loanWhatsapp('${l.id}')">Remind</button></div></td></tr>`}).join("")}</tbody></table></div>`}
-function openFollowUp(id){const l=data.loans.find(x=>x.id===id);if(!l)return;const c=getCustomer(l.customerId),f=l.followUp||{};openModal("Follow-up · "+(c?.name||"Customer"),`<form onsubmit="saveFollowUp(event,'${id}')"><div class="payment-summary"><div><span>Loan</span><b>${l.id}</b></div><div><span>Outstanding</span><b>${money(l.balance)}</b></div><div><span>Due</span><b>${l.due||"-"}</b></div></div><div class="form-grid"><div class="field"><label>Status</label><select name="status"><option ${f.status==="Pending"?"selected":""}>Pending</option><option ${f.status==="Contacted"?"selected":""}>Contacted</option><option ${f.status==="Promised"?"selected":""}>Promised</option><option ${f.status==="Done"?"selected":""}>Done</option></select></div><div class="field"><label>Next Follow-up Date</label><input name="nextDate" type="date" value="${f.nextDate||today}"></div><div class="field" style="grid-column:1/-1"><label>Notes</label><textarea name="notes" placeholder="Call outcome / promise / notes">${escx(f.notes||"")}</textarea></div></div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Save Follow-up</button></div></form>`)}
-function saveFollowUp(e,id){e.preventDefault();const l=data.loans.find(x=>x.id===id),f=new FormData(e.target);if(!l)return;l.followUp={status:f.get("status"),nextDate:f.get("nextDate"),notes:f.get("notes"),updatedAt:new Date().toISOString()};save();closeModal();toast("Follow-up updated");render("dues");}
-function requestDueNotifications(){if(!data.settings?.dueReminder)return;if(!("Notification" in window))return;if(Notification.permission==="default")Notification.requestPermission().catch(()=>{});if(Notification.permission!=="granted")return;const items=getNotifications().filter(x=>x.title.startsWith("Overdue")||x.title.includes("due today")||x.title.startsWith("Follow-up"));items.slice(0,5).forEach(x=>{try{new Notification("FINOVA · "+x.title,{body:x.text})}catch(e){}})}
-
-
+function dues(){let over=data.loans.filter(l=>l.status==="Overdue"),up=data.loans.filter(l=>l.status==="Active");page.innerHTML=title("Due Management","Today's due, upcoming due and overdue follow-up",`<button class="btn green" onclick="openPayment()">Collect Payment</button>`)+`<div class="cards"><div class="card"><div class="label">Today's Due</div><div class="value">${money(16500)}</div></div><div class="card"><div class="label">Upcoming Loans</div><div class="value">${up.length}</div></div><div class="card"><div class="label">Overdue</div><div class="value">${over.length}</div></div><div class="card"><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((a,l)=>a+l.balance,0))}</div></div></div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Overdue Follow-up</h3></div>${loanTable(over)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Upcoming / Due</h3></div>${loanTable(up)}</div>`}
 function cashbookModeTotals(){
   const todayPays=data.payments.filter(p=>p.date===today);
   const cash=todayPays.filter(p=>(p.mode||"Cash").toLowerCase()==="cash").reduce((a,p)=>a+Number(p.amount||0),0);
@@ -626,7 +602,7 @@ function addLoan(e){
   e.preventDefault();const f=new FormData(e.target),customerId=f.get("customerId"),amount=+(f.get("amount")||0),rate=+(f.get("rate")||0),tenure=+(f.get("tenure")||1),interest=amount*rate/100,total=amount+interest,installment=total/tenure;
   if(!customerId||!amount){toast("Select a customer and enter loan amount");return;}
   const id="LN-"+String(data.loans.length+123).padStart(5,"0");
-  data.loans.push({id,customerId,amount,balance:total,interest,rate,interestType:f.get("interestType"),type:f.get("type"),tenure,start:f.get("start"),due:f.get("due"),frequency:f.get("frequency"),installment,createdAt:new Date().toISOString(),status:"Active",payments:[]});
+  data.loans.push({id,customerId,amount,balance:total,interest,rate,interestType:f.get("interestType"),type:f.get("type"),tenure,start:f.get("start"),due:f.get("due"),frequency:f.get("frequency"),installment,status:"Active",payments:[]});
   const c=getCustomer(customerId);c.borrowed=(c.borrowed||0)+amount;c.balance=(c.balance||0)+total;
   save();closeModal();toast("Loan created");render("loans");
 }
@@ -675,35 +651,33 @@ function editLoan(id){
 function saveLoanEdit(e,id){
   e.preventDefault();const l=data.loans.find(x=>x.id===id),f=new FormData(e.target);l.due=f.get("due");l.status=f.get("status");l.frequency=f.get("frequency");if(l.balance<=0)l.status="Closed";save();closeModal();toast("Loan updated");render("loans");
 }
-function openPayment(loanId){   if(!loanId){openCollectionPicker();return;}   const l=data.loans.find(x=>x.id===loanId),c=getCustomer(l?.customerId);if(!l||!c)return;
+function openPayment(loanId){
+  const l=data.loans.find(x=>x.id===loanId),c=getCustomer(l?.customerId);if(!l||!c)return;
   openModal("Collect Payment",`<form onsubmit="collectPayment(event,'${loanId}')">
     <div class="payment-summary"><div><span>Customer</span><b>${c.name}</b></div><div><span>Loan</span><b>${l.id}</b></div><div><span>Outstanding</span><b>${money(l.balance)}</b></div></div>
-    <div class="form-grid"><div class="field"><label>Amount *</label><input name="amount" type="number" min="1" max="${l.balance}" value="${Math.min(l.balance,l.installment||5000)}" required></div><div class="field"><label>Payment Mode</label><select name="mode"><option>Cash</option><option>UPI</option><option>Bank</option></select></div><div class="field"><label>Payment Date</label><input name="date" type="date" value="${today}" required></div><div class="field"><label>Reference / UTR</label><input name="ref" placeholder="Optional transaction reference"></div><div class="field"><label>Notes</label><input name="notes"></div></div>
+    <div class="form-grid"><div class="field"><label>Amount *</label><input name="amount" type="number" min="1" max="${l.balance}" value="${Math.min(l.balance,l.installment||5000)}" required></div><div class="field"><label>Payment Mode</label><select name="mode"><option>Cash</option><option>UPI</option><option>Bank</option></select></div><div class="field"><label>Payment Date</label><input name="date" type="date" value="${today}" required></div><div class="field"><label>Notes</label><input name="notes"></div></div>
     <div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Collect Payment</button></div>
   </form>`);
 }
 function collectPayment(e,loanId){
   e.preventDefault();const f=new FormData(e.target),l=data.loans.find(x=>x.id===loanId),c=getCustomer(l.customerId),amount=+(f.get("amount")||0);
   if(!l||amount<=0||amount>l.balance){toast("Enter a valid payment amount");return;}
-  const id=nextReceiptId();
-  const previousBalance=Number(l.balance||0),paymentDate=f.get("date")||today;
-  const newBalance=Math.max(0,previousBalance-amount);
-  data.payments.push({id,loanId,customerId:c.id,amount,date:paymentDate,mode:f.get("mode"),ref:f.get("ref"),notes:f.get("notes"),previousBalance,balanceAfter:newBalance,createdAt:new Date().toISOString()});
-  l.balance=newBalance;
+  const id="RC-"+String(data.payments.length+4).padStart(5,"0");
+  data.payments.push({id,loanId,customerId:c.id,amount,date:f.get("date"),mode:f.get("mode"),notes:f.get("notes")});
+  l.balance=Math.max(0,l.balance-amount);
   c.balance=Math.max(0,c.balance-amount);
   l.status=l.balance<=0?"Closed":(l.due<today?"Overdue":"Active");
-  if(l.balance<=0){l.followUp={...(l.followUp||{}),status:"Done",nextDate:""};}
   save();closeModal();toast("Payment collected · "+id);render("loans");
 }
 function receipt(id){
   let p=data.payments.find(x=>x.id===id),c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);
-  const previous=Number(p.previousBalance??((l?.balance||0)+Number(p.amount||0)));const after=Number(p.balanceAfter??(l?.balance||0));
-  const msg=encodeURIComponent(`FINOVA FINANCE Payment Receipt%0AReceipt: ${p.id}%0ACustomer: ${c.name}%0ALoan: ${l.id}%0APaid: ${money(p.amount)}%0ABalance: ${money(after)}%0ADate: ${p.date}%0AMode: ${p.mode}`);
+  const previous=(l?.balance||0)+p.amount;
+  const msg=encodeURIComponent(`FINOVA FINANCE Payment Receipt%0AReceipt: ${p.id}%0ACustomer: ${c.name}%0ALoan: ${l.id}%0APaid: ${money(p.amount)}%0ABalance: ${money(l.balance)}%0ADate: ${p.date}%0AMode: ${p.mode}`);
   openModal("Payment Receipt",`<div id="printReceipt" class="receipt">
     <div class="receipt-brand"><div class="logo">₹</div><div><h2>FINOVA FINANCE</h2><span>Official Payment Receipt</span></div></div>
     <div class="receipt-grid"><div><span>Receipt No</span><b>${p.id}</b></div><div><span>Date</span><b>${p.date}</b></div><div><span>Customer</span><b>${c.name}</b></div><div><span>Loan No</span><b>${l.id}</b></div></div>
     <div class="receipt-amount"><span>Payment Received</span><strong>${money(p.amount)}</strong></div>
-    <div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(after)}</b></div><div><span>Payment Mode</span><b>${p.mode}</b></div><div><span>Reference</span><b>${p.ref||"-"}</b></div></div>
+    <div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(l.balance)}</b></div><div><span>Payment Mode</span><b>${p.mode}</b></div><div><span>Reference</span><b>${p.ref||"-"}</b></div></div>
     <div class="receipt-note">Thank you for your payment. Please keep this receipt for your records.</div>
   </div>
   <div class="form-actions">
@@ -828,7 +802,6 @@ function getNotifications(){
   const recent=(data.payments||[]).filter(p=>p.date===today).slice(0,3);
   const items=[];
   overdue.slice(0,4).forEach(l=>{const c=getCustomer(l.customerId);items.push({title:`Overdue: ${c?.name||'Customer'}`,text:`${l.id} · ${money(l.balance)} outstanding`,page:'dues'});});
-  (data.loans||[]).filter(followUpDue).slice(0,4).forEach(l=>{const c=getCustomer(l.customerId);items.push({title:`Follow-up due: ${c?.name||'Customer'}`,text:`${l.id} · ${money(l.balance)} outstanding`,page:'dues'});});
   due.slice(0,3).forEach(l=>{const c=getCustomer(l.customerId);items.push({title:`Payment due today: ${c?.name||'Customer'}`,text:`${l.id} · ${money(l.installment||l.balance||0)}`,page:'dues'});});
   recent.forEach(p=>items.push({title:'Payment received',text:`${p.id} · ${money(p.amount)} · ${p.mode||'Cash'}`,page:'collections'}));
   return items;
@@ -855,8 +828,222 @@ function appLogout(){
 document.addEventListener('DOMContentLoaded',()=>{
   const nb=document.getElementById('notificationBtn'), pb=document.getElementById('profileBtn');
   renderNotifications();
-  setTimeout(requestDueNotifications,500);
   nb?.addEventListener('click',e=>{e.stopPropagation();const m=document.getElementById('notificationMenu');const open=m.classList.contains('hidden');closeTopMenus();if(open){m.classList.remove('hidden');nb.setAttribute('aria-expanded','true');}});
   pb?.addEventListener('click',e=>{e.stopPropagation();const m=document.getElementById('profileMenu');const open=m.classList.contains('hidden');closeTopMenus();if(open){m.classList.remove('hidden');pb.setAttribute('aria-expanded','true');}});
   document.addEventListener('click',e=>{if(!e.target.closest('.top-menu-wrap'))closeTopMenus()});
 });
+
+/* =========================================================
+   FINOVA PROFESSIONAL PACK
+   Functionality-only upgrade. Existing visual structure is preserved.
+   ========================================================= */
+(function(){
+  data.followUps=Array.isArray(data.followUps)?data.followUps:[];
+  data.auditLog=Array.isArray(data.auditLog)?data.auditLog:[];
+  data.cashClosings=Array.isArray(data.cashClosings)?data.cashClosings:[];
+  data.users=Array.isArray(data.users)?data.users:[{id:'USR-001',name:'Admin',role:'Admin',active:true}];
+  data.settings=data.settings||{};
+  data.settings.role=data.settings.role||'Admin';
+  data.settings.graceDays=Number(data.settings.graceDays||0);
+  data.loans.forEach(l=>{
+    l.createdAt=l.createdAt||l.start||today;
+    l.interestType=l.interestType||'Flat';
+    l.frequency=l.frequency||'Monthly';
+    l.tenure=Number(l.tenure||1);
+    l.installment=Number(l.installment||(((l.amount||0)+(l.interest||0))/Math.max(1,l.tenure)));
+    l.status=l.balance<=0?'Closed':((l.due&&l.due<today)?'Overdue':(l.due===today?'Active':(l.status||'Active')));
+  });
+  data.payments.forEach(p=>{p.time=p.time||'';p.ref=p.ref||p.reference||'';p.notes=p.notes||'';p.createdAt=p.createdAt||p.date||today;});
+  data.customers.forEach(c=>{c.balance=Number(c.balance||0);c.borrowed=Number(c.borrowed||0);c.followUpStatus=c.followUpStatus||'Pending';});
+  save();
+})();
+
+function profNow(){return new Date().toISOString();}
+function audit(action,entity,entityId,details){
+  data.auditLog=data.auditLog||[];
+  data.auditLog.unshift({id:'AUD-'+Date.now(),timestamp:profNow(),user:(data.settings?.ownerName||'Admin'),role:(data.settings?.role||'Admin'),action,entity,entityId:entityId||'',details:details||''});
+  data.auditLog=data.auditLog.slice(0,1000); save();
+}
+function roleAllowed(roles){const r=data.settings?.role||'Admin';return roles.includes(r)||r==='Admin';}
+function guard(roles){if(roleAllowed(roles))return true;toast('Your role does not have permission for this action');return false;}
+function refreshLoanStatuses(){
+  let changed=false;
+  data.loans.forEach(l=>{const old=l.status; l.status=l.balance<=0?'Closed':(l.due&&l.due<today?'Overdue':'Active');if(old!==l.status)changed=true;});
+  if(changed)save();
+}
+function loanTotal(l){return Number(l.amount||0)+Number(l.interest||0)}
+function paidForLoan(l){return Math.max(0,loanTotal(l)-Number(l.balance||0))}
+function dueAmountToday(){return data.loans.filter(l=>l.balance>0&&l.due===today).reduce((s,l)=>s+Math.min(Number(l.balance||0),Number(l.installment||l.balance||0)),0)}
+function overdueLoans(){return data.loans.filter(l=>l.balance>0&&(l.status==='Overdue'||(l.due&&l.due<today)))}
+function nextDueDate(l){
+  const start=new Date(l.start||today); const n=Math.max(1,Number(l.tenure||1));
+  const ps=data.payments.filter(p=>p.loanId===l.id).reduce((s,p)=>s+Number(p.amount||0),0);
+  const inst=Number(l.installment||loanTotal(l)/n)||loanTotal(l);
+  let paidInst=Math.floor(ps/inst);
+  if(ps>=loanTotal(l)-.01)return '';
+  const d=new Date(start); const idx=Math.min(n,Math.max(1,paidInst+1));
+  if(l.frequency==='Weekly')d.setDate(d.getDate()+7*idx);else if(l.frequency==='Daily')d.setDate(d.getDate()+idx);else d.setMonth(d.getMonth()+idx);
+  return d.toISOString().slice(0,10);
+}
+function escapeCsv(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
+function downloadTextFile(name,text,type='text/plain'){const blob=new Blob([text],{type}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+function exportProfessionalCSV(kind){
+  if(!guard(['Admin','Manager','Viewer']))return;
+  let rows=[],name='finova-export.csv';
+  if(kind==='customers'){rows=[['ID','Name','Mobile','Area','Occupation','Borrowed','Outstanding','Follow-up Status'],...data.customers.map(c=>[c.id,c.name,c.mobile,c.area,c.occupation,c.borrowed,c.balance,c.followUpStatus])];name='finova-customers.csv';}
+  if(kind==='loans'){rows=[['Loan ID','Customer','Principal','Interest','Total','Paid','Outstanding','Due','Frequency','Status'],...data.loans.map(l=>[l.id,getCustomer(l.customerId)?.name||'',l.amount,l.interest,loanTotal(l),paidForLoan(l),l.balance,l.due,l.frequency,l.balance<=0?'Closed':l.status])];name='finova-loans.csv';}
+  if(kind==='payments'){rows=[['Receipt','Date','Customer','Loan','Amount','Mode','Reference','Notes'],...data.payments.map(p=>[p.id,p.date,getCustomer(p.customerId)?.name||'',p.loanId,p.amount,p.mode,p.ref,p.notes])];name='finova-payments.csv';}
+  if(kind==='audit'){rows=[['Timestamp','User','Role','Action','Entity','Entity ID','Details'],...data.auditLog.map(a=>[a.timestamp,a.user,a.role,a.action,a.entity,a.entityId,a.details])];name='finova-audit-log.csv';}
+  downloadTextFile(name,rows.map(r=>r.map(escapeCsv).join(',')).join('\n'),'text/csv');toast('CSV exported');
+}
+
+function openFollowUp(customerId,loanId){
+  if(!guard(['Admin','Manager','Collector']))return;
+  const c=getCustomer(customerId); if(!c)return;
+  const existing=(data.followUps||[]).filter(x=>x.customerId===customerId).sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
+  openModal('Customer Follow-up',`<form onsubmit="saveFollowUp(event,'${customerId}','${loanId||''}')"><div class="form-grid">
+    <div class="field"><label>Status</label><select name="status"><option>Pending</option><option>Contacted</option><option>Promised</option><option>Done</option></select></div>
+    <div class="field"><label>Priority</label><select name="priority"><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+    <div class="field"><label>Next Follow-up</label><input type="date" name="date" value="${existing?.date||today}"></div>
+    <div class="field"><label>Loan</label><select name="loanId"><option value="">Customer</option>${data.loans.filter(l=>l.customerId===customerId).map(l=>`<option value="${l.id}" ${l.id===loanId?'selected':''}>${l.id} · ${money(l.balance)}</option>`).join('')}</select></div>
+    <div class="field" style="grid-column:1/-1"><label>Notes</label><textarea name="notes" rows="4" placeholder="Call result, promise date, next action...">${esc(existing?.notes||'')}</textarea></div>
+  </div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Save Follow-up</button></div></form>`);
+}
+function saveFollowUp(e,customerId,loanId){
+  e.preventDefault(); const f=new FormData(e.target); const item={id:'FU-'+Date.now(),customerId,loanId:f.get('loanId')||loanId||'',status:f.get('status'),priority:f.get('priority'),date:f.get('date')||today,notes:f.get('notes')||'',createdAt:profNow()};
+  data.followUps=data.followUps||[];data.followUps.unshift(item);const c=getCustomer(customerId);if(c)c.followUpStatus=item.status;save();audit('Follow-up saved','Customer',customerId,`${item.status} · ${item.priority}`);closeModal();toast('Follow-up saved');render('dues');
+}
+function followUpHistory(customerId){
+  const c=getCustomer(customerId),items=(data.followUps||[]).filter(x=>x.customerId===customerId).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  openModal('Follow-up History · '+(c?.name||''),items.length?`<div class="followup-history">${items.map(x=>`<div class="followup-item"><div><b>${x.status}</b><small>${x.date||'-'} · ${x.priority||'Medium'} ${x.loanId?'· '+x.loanId:''}</small></div><p>${esc(x.notes||'No notes')}</p></div>`).join('')}</div>`:`<div class="empty">No follow-up history</div>`);
+}
+
+function professionalDues(){
+  refreshLoanStatuses();
+  const over=overdueLoans(), todayLoans=data.loans.filter(l=>l.balance>0&&l.due===today), upcoming=data.loans.filter(l=>l.balance>0&&l.due>today).sort((a,b)=>a.due.localeCompare(b.due));
+  const promised=(data.followUps||[]).filter(x=>x.status==='Promised'&&x.date>=today).length;
+  page.innerHTML=title('Due Management','Today, upcoming and overdue collection workflow',`<button class="btn green" onclick="openPayment()">Collect Payment</button><button class="btn light" onclick="exportProfessionalCSV('loans')">Export Loans</button>`)+
+  `<div class="cards"><div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(dueAmountToday())}</div><div class="sub">${todayLoans.length} loans</div></div><div class="metric-icon">◷</div></div>
+  <div class="card metric"><div><div class="label">Upcoming</div><div class="value">${upcoming.length}</div><div class="sub">Future installments</div></div><div class="metric-icon">→</div></div>
+  <div class="card metric"><div><div class="label">Overdue</div><div class="value">${money(over.reduce((s,l)=>s+l.balance,0))}</div><div class="sub">${over.length} loans</div></div><div class="metric-icon">!</div></div>
+  <div class="card metric"><div><div class="label">Promised Follow-ups</div><div class="value">${promised}</div><div class="sub">Need monitoring</div></div><div class="metric-icon">✓</div></div></div>
+  <div class="section" style="margin-top:17px"><div class="section-head"><div><h3>🔴 Overdue Follow-up Queue</h3><p class="muted">Prioritize accounts and record every contact</p></div></div>
+  ${over.length?`<div class="table-scroll"><table class="table"><thead><tr><th>CUSTOMER</th><th>LOAN</th><th>OVERDUE</th><th>OUTSTANDING</th><th>FOLLOW-UP</th><th>ACTION</th></tr></thead><tbody>${over.map(l=>{const c=getCustomer(l.customerId);const fu=(data.followUps||[]).filter(x=>x.customerId===c?.id).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];const days=Math.max(1,Math.floor((Date.parse(today)-Date.parse(l.due))/86400000));return `<tr><td><b>${esc(c?.name||'Customer')}</b><small>${esc(c?.mobile||'')}</small></td><td>${l.id}</td><td>${days} days</td><td><b>${money(l.balance)}</b></td><td><span class="status ${String(fu?.status||'Pending').toLowerCase()}">${fu?.status||'Pending'}</span>${fu?.date?`<small>${fu.date}</small>`:''}</td><td><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button> <button class="mini-btn" onclick="openFollowUp('${c?.id}','${l.id}')">Follow-up</button></td></tr>`}).join('')}</tbody></table></div>`:`<div class="empty">No overdue loans 🎉</div>`}</div>
+  <div class="section" style="margin-top:17px"><div class="section-head"><div><h3>📅 Today's Due</h3><p class="muted">Expected collection</p></div></div>${loanRows(todayLoans)}</div>
+  <div class="section" style="margin-top:17px"><div class="section-head"><div><h3>Upcoming Loans</h3><p class="muted">Next scheduled installments</p></div></div>${loanRows(upcoming.slice(0,30))}</div>`;
+}
+dues=professionalDues;
+
+function openPaymentPro(loanId){
+  if(!guard(['Admin','Manager','Collector']))return;
+  let l=data.loans.find(x=>x.id===loanId); if(!l){const active=data.loans.filter(x=>x.balance>0);if(active.length===1)l=active[0];}
+  if(!l)return toast('Select a loan to collect payment');
+  const c=getCustomer(l.customerId);if(!c)return;
+  const suggested=Math.min(Number(l.balance||0),Number(l.installment||5000));
+  openModal('Collect Payment',`<form onsubmit="collectPaymentPro(event,'${l.id}')">
+    <div class="payment-summary"><div><span>Customer</span><b>${esc(c.name)}</b></div><div><span>Loan</span><b>${l.id}</b></div><div><span>Outstanding</span><b>${money(l.balance)}</b></div></div>
+    <div class="form-grid"><div class="field"><label>Amount *</label><input name="amount" type="number" min="1" max="${l.balance}" step="0.01" value="${suggested}" required></div><div class="field"><label>Payment Mode</label><select name="mode"><option>Cash</option><option>UPI</option><option>Bank</option></select></div><div class="field"><label>Payment Date</label><input name="date" type="date" value="${today}" required></div><div class="field"><label>Reference / UTR</label><input name="ref" placeholder="Optional reference"></div><div class="field" style="grid-column:1/-1"><label>Notes</label><textarea name="notes" rows="3" placeholder="Optional collection note"></textarea></div></div>
+    <div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Save Payment & Receipt</button></div></form>`);
+}
+function collectPaymentPro(e,loanId){
+  e.preventDefault();if(!guard(['Admin','Manager','Collector']))return;
+  const f=new FormData(e.target),l=data.loans.find(x=>x.id===loanId),c=getCustomer(l?.customerId),amount=Number(f.get('amount')||0);
+  if(!l||!c||amount<=0||amount>Number(l.balance||0))return toast('Enter a valid payment amount');
+  const id=(data.settings?.receiptPrefix||'RC')+'-'+String(data.payments.length+1).padStart(5,'0');
+  const before=Number(l.balance||0),date=f.get('date')||today;
+  const p={id,loanId,customerId:c.id,amount,date,mode:f.get('mode')||'Cash',ref:f.get('ref')||'',notes:f.get('notes')||'',time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),createdAt:profNow(),previousBalance:before,balanceAfter:Math.max(0,before-amount)};
+  data.payments.push(p);l.balance=Math.max(0,before-amount);c.balance=Math.max(0,Number(c.balance||0)-amount);l.status=l.balance<=0?'Closed':(l.due&&l.due<date?'Overdue':'Active');l.due=nextDueDate(l)||l.due;
+  if(l.balance<=0){l.status='Closed';l.due='';}
+  save();audit('Payment collected','Payment',id,`${c.name} · ${money(amount)} · ${p.mode} · ${l.id}`);closeModal();toast('Payment saved · '+id);receipt(id);render('collections');
+}
+openPayment=openPaymentPro; collectPayment=collectPaymentPro;
+
+function receiptPro(id){
+  const p=data.payments.find(x=>x.id===id);if(!p)return;const c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);if(!c||!l)return;
+  const previous=Number(p.previousBalance??(Number(l.balance||0)+Number(p.amount||0)));const after=Number(p.balanceAfter??l.balance);
+  const msg=encodeURIComponent(`FINOVA FINANCE Payment Receipt\nReceipt: ${p.id}\nCustomer: ${c.name}\nLoan: ${l.id}\nPaid: ${money(p.amount)}\nBalance: ${money(after)}\nDate: ${p.date}\nMode: ${p.mode}${p.ref?'\nReference: '+p.ref:''}`);
+  openModal('Payment Receipt',`<div id="printReceipt" class="receipt"><div class="receipt-brand"><div class="logo">₹</div><div><h2>${esc(data.settings?.businessName||'FINOVA FINANCE')}</h2><span>Official Payment Receipt</span></div></div><div class="receipt-grid"><div><span>Receipt No</span><b>${esc(p.id)}</b></div><div><span>Date / Time</span><b>${esc(p.date||'-')} ${esc(p.time||'')}</b></div><div><span>Customer</span><b>${esc(c.name)}</b></div><div><span>Loan No</span><b>${esc(l.id)}</b></div></div><div class="receipt-amount"><span>Payment Received</span><strong>${money(p.amount)}</strong></div><div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(after)}</b></div><div><span>Payment Mode</span><b>${esc(p.mode||'-')}</b></div><div><span>Reference</span><b>${esc(p.ref||'-')}</b></div></div>${p.notes?`<div class="receipt-note"><b>Notes:</b> ${esc(p.notes)}</div>`:''}<div class="receipt-note">Thank you for your payment. Please keep this receipt for your records.</div></div><div class="form-actions"><button class="btn light" onclick="printReceipt('${id}')">Print / PDF</button><button class="btn green" onclick="window.open('https://wa.me/${String(c.mobile||'').replace(/\D/g,'')}?text=${msg}','_blank')">WhatsApp</button></div>`);
+}
+receipt=receiptPro;
+
+function dailyClosing(){
+  if(!guard(['Admin','Manager']))return;
+  const existing=(data.cashClosings||[]).find(x=>x.date===today);
+  const pays=data.payments.filter(p=>p.date===today);const exps=(data.expenses||[]).filter(e=>e.date===today);
+  const cashIn=pays.filter(p=>(p.mode||'Cash').toLowerCase()==='cash').reduce((s,p)=>s+Number(p.amount||0),0);
+  const cashOut=exps.filter(e=>(e.mode||'Cash').toLowerCase()==='cash').reduce((s,e)=>s+Number(e.amount||0),0);
+  const opening=Number(data.settings?.openingCash||0),expected=opening+cashIn-cashOut;
+  openModal('End of Day Closing',`<div class="closing-grid"><div><span>Opening Cash</span><b>${money(opening)}</b></div><div><span>Cash Collection</span><b>${money(cashIn)}</b></div><div><span>Cash Expenses</span><b>${money(cashOut)}</b></div><div><span>Expected Closing</span><b>${money(expected)}</b></div></div><form onsubmit="saveDailyClosing(event)"><div class="form-grid"><div class="field"><label>Actual Cash Counted *</label><input name="actual" type="number" min="0" step="0.01" value="${existing?.actual??expected}" required></div><div class="field"><label>Closing Notes</label><input name="notes" value="${esc(existing?.notes||'')}"></div></div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">${existing?'Update':'Close'} Day</button></div></form>`);
+}
+function saveDailyClosing(e){
+  e.preventDefault();const actual=Number(new FormData(e.target).get('actual'));if(!Number.isFinite(actual)||actual<0)return toast('Enter valid cash count');
+  const pays=data.payments.filter(p=>p.date===today),exps=(data.expenses||[]).filter(e=>e.date===today);const cashIn=pays.filter(p=>(p.mode||'Cash').toLowerCase()==='cash').reduce((s,p)=>s+Number(p.amount||0),0),cashOut=exps.filter(x=>(x.mode||'Cash').toLowerCase()==='cash').reduce((s,x)=>s+Number(x.amount||0),0),opening=Number(data.settings?.openingCash||0),expected=opening+cashIn-cashOut;
+  const rec={date:today,opening,cashCollection:cashIn,cashExpense:cashOut,expected,actual,difference:actual-expected,notes:new FormData(e.target).get('notes')||'',closedAt:profNow(),closedBy:data.settings?.ownerName||'Admin'};
+  data.cashClosings=data.cashClosings||[];const i=data.cashClosings.findIndex(x=>x.date===today);if(i>=0)data.cashClosings[i]=rec;else data.cashClosings.push(rec);save();audit('Day closed','Cashbook',today,`Expected ${money(expected)} · Actual ${money(actual)} · Difference ${money(actual-expected)}`);closeModal();toast('Day closing saved');cashbook();
+}
+
+function auditLogView(){
+  if(!guard(['Admin','Manager','Viewer']))return;
+  const rows=(data.auditLog||[]).slice(0,200);openModal('Audit Log',`<div class="section-head"><div><h3>System Activity</h3><p class="muted">Every important change is recorded locally</p></div><button class="btn light" onclick="exportProfessionalCSV('audit')">Export CSV</button></div><div class="table-scroll"><table class="table"><thead><tr><th>TIME</th><th>USER</th><th>ROLE</th><th>ACTION</th><th>ENTITY</th><th>DETAILS</th></tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(a.timestamp||'')}</td><td>${esc(a.user)}</td><td>${esc(a.role)}</td><td><b>${esc(a.action)}</b></td><td>${esc(a.entity)} ${esc(a.entityId)}</td><td>${esc(a.details)}</td></tr>`).join('')||`<tr><td colspan="6"><div class="empty">No audit activity yet</div></td></tr>`}</tbody></table></div>`);
+}
+
+function appSettingsPro(){
+  const s=data.settings||{};
+  page.innerHTML=title('Settings','Business profile, finance defaults, security and professional controls',`<button class="btn" onclick="exportBackup()">Backup Data</button><button class="btn green" onclick="importBackup()">Restore Data</button>`)+
+  `<div class="settings-grid">
+  <div class="section"><div class="section-head"><div><h3>Business Profile</h3><p class="muted">Shown on receipts and reports</p></div></div><div class="form-grid settings-form"><label>Business Name<input id="setBusinessName" value="${esc(s.businessName||'FINOVA Finance')}"></label><label>Owner / Admin Name<input id="setOwnerName" value="${esc(s.ownerName||'Admin')}"></label><label>Mobile Number<input id="setMobile" value="${esc(s.mobile||'')}"></label><label>Address<input id="setAddress" value="${esc(s.address||'')}"></label><label>Receipt Prefix<input id="setReceiptPrefix" value="${esc(s.receiptPrefix||'RC')}"></label><label>Currency<select id="setCurrency"><option ${s.currency==='INR'||!s.currency?'selected':''}>INR</option><option ${s.currency==='USD'?'selected':''}>USD</option></select></label></div></div>
+  <div class="section"><div class="section-head"><div><h3>Loan Defaults</h3><p class="muted">Used for new loans</p></div></div><div class="form-grid settings-form"><label>Default Interest %<input id="setInterest" type="number" step="0.01" value="${Number(s.defaultInterest||10)}"></label><label>Interest Type<select id="setInterestType"><option ${s.interestType==='Flat'||!s.interestType?'selected':''}>Flat</option><option ${s.interestType==='Reducing'?'selected':''}>Reducing</option></select></label><label>Default Frequency<select id="setFrequency"><option ${s.frequency==='Monthly'||!s.frequency?'selected':''}>Monthly</option><option ${s.frequency==='Weekly'?'selected':''}>Weekly</option><option ${s.frequency==='Daily'?'selected':''}>Daily</option></select></label><label>Opening Cash<input id="setOpeningCash" type="number" value="${Number(s.openingCash||50000)}"></label><label>Grace Period (days)<input id="setGrace" type="number" value="${Number(s.graceDays||0)}"></label></div></div>
+  <div class="section"><div class="section-head"><div><h3>Roles & Permissions</h3><p class="muted">Local role controls for this device</p></div></div><div class="form-grid settings-form"><label>Current Role<select id="setRole"><option ${s.role==='Admin'?'selected':''}>Admin</option><option ${s.role==='Manager'?'selected':''}>Manager</option><option ${s.role==='Collector'?'selected':''}>Collector</option><option ${s.role==='Viewer'?'selected':''}>Viewer</option></select></label><label>Session User<input id="setUserName" value="${esc(s.ownerName||'Admin')}"></label></div><div class="settings-note">Admin: full access · Manager: finance and reports · Collector: collection and follow-up · Viewer: read-only reports.</div></div>
+  <div class="section"><div class="section-head"><div><h3>Receipt & Collection</h3><p class="muted">Payment behavior</p></div></div><div class="settings-options"><label class="toggle-row"><span><b>Allow Partial Payments</b><small>Accept less than installment</small></span><input id="setPartial" type="checkbox" ${s.partialPayments!==false?'checked':''}></label><label class="toggle-row"><span><b>Show Balance on Receipt</b><small>Print remaining balance</small></span><input id="setReceiptBalance" type="checkbox" ${s.receiptBalance!==false?'checked':''}></label><label class="toggle-row"><span><b>Due Reminder</b><small>Highlight due and overdue accounts</small></span><input id="setReminder" type="checkbox" ${s.dueReminder!==false?'checked':''}></label></div></div>
+  <div class="section"><div class="section-head"><div><h3>Professional Controls</h3><p class="muted">Operations and audit</p></div></div><div class="data-actions"><button class="btn" onclick="dailyClosing()">End of Day Closing</button><button class="btn" onclick="auditLogView()">Audit Log</button><button class="btn" onclick="exportProfessionalCSV('customers')">Customers CSV</button><button class="btn" onclick="exportProfessionalCSV('loans')">Loans CSV</button><button class="btn" onclick="exportProfessionalCSV('payments')">Payments CSV</button></div><div class="settings-note">Use End of Day Closing to reconcile cash. Audit Log records key actions on this device.</div></div>
+  <div class="section"><div class="section-head"><div><h3>Data Management</h3><p class="muted">Protect your local finance records</p></div></div><div class="data-actions"><button class="btn" onclick="exportBackup()">Export Backup</button><button class="btn" onclick="importBackup()">Import Backup</button><button class="btn danger-btn" onclick="resetDemoConfirm()">Reset Demo Data</button></div></div></div>
+  <div class="settings-save"><button class="btn green" onclick="saveSettingsPro()">Save Settings</button></div>`;
+}
+function saveSettingsPro(){
+  data.settings=data.settings||{};const oldRole=data.settings.role;
+  Object.assign(data.settings,{businessName:document.getElementById('setBusinessName').value.trim()||'FINOVA Finance',ownerName:document.getElementById('setOwnerName').value.trim()||'Admin',mobile:document.getElementById('setMobile').value.trim(),address:document.getElementById('setAddress').value.trim(),receiptPrefix:document.getElementById('setReceiptPrefix').value.trim()||'RC',currency:document.getElementById('setCurrency').value,defaultInterest:Number(document.getElementById('setInterest').value||0),interestType:document.getElementById('setInterestType').value,frequency:document.getElementById('setFrequency').value,openingCash:Number(document.getElementById('setOpeningCash').value||0),graceDays:Number(document.getElementById('setGrace').value||0),role:document.getElementById('setRole').value,partialPayments:document.getElementById('setPartial').checked,receiptBalance:document.getElementById('setReceiptBalance').checked,dueReminder:document.getElementById('setReminder').checked});
+  save();audit('Settings updated','System','settings',`Role ${oldRole||'Admin'} → ${data.settings.role}`);toast('✓ Settings saved successfully');setTimeout(()=>appSettingsPro(),250);
+}
+appSettings=appSettingsPro;
+
+function dashboardPro(){
+  refreshLoanStatuses();
+  const active=data.loans.filter(l=>l.balance>0).length,dis=data.loans.reduce((s,l)=>s+Number(l.amount||0),0),out=data.loans.reduce((s,l)=>s+Number(l.balance||0),0),col=data.payments.filter(p=>p.date===today).reduce((s,p)=>s+Number(p.amount||0),0),over=overdueLoans(),due=data.loans.filter(l=>l.balance>0&&l.due===today),target=dueAmountToday(),rate=target?Math.round(col/target*100):0;
+  const month=new Date(today);month.setDate(1);const monthStart=month.toISOString().slice(0,10);const monthCol=data.payments.filter(p=>p.date>=monthStart&&p.date<=today).reduce((s,p)=>s+Number(p.amount||0),0);const monthExp=(data.expenses||[]).filter(e=>e.date>=monthStart&&e.date<=today).reduce((s,e)=>s+Number(e.amount||0),0);
+  page.innerHTML=title('Dashboard','Complete finance overview for today',`<button class="btn green" onclick="openCustomer()">+ New Customer</button><button class="btn" onclick="openLoan()">+ New Loan</button><button class="btn light" onclick="openPayment()">Collect Payment</button>`)+
+  `<div class="cards"><div class="card metric"><div><div class="label">Today's Collection</div><div class="value">${money(col)}</div><div class="sub">↑ Payments received</div></div><div class="metric-icon">↙</div></div><div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(target)}</div><div class="sub">${rate}% collection efficiency</div></div><div class="metric-icon">◷</div></div><div class="card metric"><div><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((s,l)=>s+l.balance,0))}</div><div class="sub" style="color:#d34d59">${over.length} loans need follow-up</div></div><div class="metric-icon">!</div></div><div class="card metric"><div><div class="label">New Loans</div><div class="value">${data.loans.filter(l=>(l.createdAt||l.start||'')>=monthStart).length}</div><div class="sub">This month</div></div><div class="metric-icon">▣</div></div></div>
+  <div class="cards" style="margin-top:14px"><div class="card"><div class="label">Active Customers</div><div class="value">${data.customers.filter(c=>c.balance>0).length}</div></div><div class="card"><div class="label">Total Disbursed</div><div class="value">${money(dis)}</div></div><div class="card"><div class="label">Outstanding</div><div class="value">${money(out)}</div></div><div class="card"><div class="label">Month Net Movement</div><div class="value">${money(monthCol-monthExp)}</div></div></div>
+  <div class="layout2"><div class="section"><div class="section-head"><h3>Collection Performance</h3><span class="muted">Today vs target</span></div><div class="progress-track" style="height:14px;margin:20px 0"><div class="progress-fill" style="width:${Math.min(100,rate)}%"></div></div><div class="kpis"><div class="kpi"><span>Collected</span><b>${money(col)}</b></div><div class="kpi"><span>Target</span><b>${money(target)}</b></div><div class="kpi"><span>Efficiency</span><b>${rate}%</b></div></div></div><div class="section"><div class="section-head"><h3>Money Position</h3><span class="muted">Today</span></div>${(()=>{const pays=data.payments.filter(p=>p.date===today);const ex=(data.expenses||[]).filter(e=>e.date===today);const modes=['Cash','UPI','Bank'];return `<div class="kpis">${modes.map(m=>{const v=pays.filter(p=>(p.mode||'').toLowerCase()===m.toLowerCase()).reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="kpi"><span>${m}</span><b>${money(v)}</b></div>`}).join('')}</div>`})()}</div></div>
+  <div class="section" style="margin-top:17px"><div class="section-head"><h3>🔴 Overdue Customers</h3><button class="btn light" onclick="render('dues')">View All</button></div>${over.slice(0,8).map(l=>{const c=getCustomer(l.customerId);return `<div class="alert-box"><div><b>${esc(c?.name||'Customer')}</b><small>${l.id} · ${Math.max(1,Math.floor((Date.parse(today)-Date.parse(l.due))/86400000))} days overdue</small></div><div style="text-align:right"><div class="amount-red">${money(l.balance)}</div><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button> <button class="mini-btn" onclick="openFollowUp('${c?.id}','${l.id}')">Follow-up</button></div></div>`}).join('')||`<div class="empty">No overdue loans 🎉</div>`}</div>
+  <div class="section" style="margin-top:17px"><div class="section-head"><h3>📅 Today's Due</h3><button class="btn light" onclick="render('dues')">View All</button></div>${due.map(l=>{const c=getCustomer(l.customerId);return `<div class="due-row"><div class="person"><div class="avatar">${(c?.name||'?')[0]}</div><div><b>${esc(c?.name||'Customer')}</b><small>${l.id}</small></div></div><div>${money(Math.min(l.balance,l.installment||l.balance))}</div><div>${l.due}</div><span class="status due">Due</span><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button></div>`}).join('')||`<div class="empty">No dues today</div>`}</div>
+  <div class="layout2"><div class="section"><div class="section-head"><h3>Recent Transactions</h3><button class="btn light" onclick="render('collections')">View All</button></div>${data.payments.slice().sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).slice(0,6).map(p=>{const c=getCustomer(p.customerId);return `<div class="txn"><div class="txn-left"><div class="txn-icon">↙</div><div><b>${esc(c?.name||'Customer')} payment</b><small>${p.date} · ${p.mode}${p.ref?' · '+esc(p.ref):''}</small></div></div><span class="positive">+ ${money(p.amount)}</span></div>`}).join('')||`<div class="empty">No transactions</div>`}</div><div class="section"><div class="section-head"><h3>Quick Reports</h3></div><div class="data-actions"><button class="btn light" onclick="render('reports')">Reports</button><button class="btn light" onclick="dailyClosing()">End of Day</button><button class="btn light" onclick="auditLogView()">Audit Log</button></div><div class="detail-list"><span>Monthly Collections <b>${money(monthCol)}</b></span><span>Monthly Expenses <b>${money(monthExp)}</b></span><span>Outstanding <b>${money(out)}</b></span></div></div></div>`;
+}
+dashboard=dashboardPro;
+
+/* Attach non-visual top-bar menus without changing the existing header layout. */
+document.addEventListener('DOMContentLoaded',()=>{
+  const actions=document.querySelector('.top-actions'); if(!actions)return;
+  const bell=actions.querySelector('.icon-btn'); const profile=actions.querySelector('.profile');
+  if(bell){bell.id='notificationBtn';bell.style.position='relative';const wrap=document.createElement('div');wrap.className='top-menu-wrap';bell.parentNode.insertBefore(wrap,bell);wrap.appendChild(bell);wrap.insertAdjacentHTML('beforeend','<div id="notificationMenu" class="top-menu hidden"><div class="top-menu-head"><b>Notifications</b><button onclick="clearNotifications()">Clear</button></div><div id="notificationList"></div></div>');}
+  if(profile){profile.id='profileBtn';profile.style.position='relative';const wrap=document.createElement('div');wrap.className='top-menu-wrap';profile.parentNode.insertBefore(wrap,profile);wrap.appendChild(profile);wrap.insertAdjacentHTML('beforeend','<div id="profileMenu" class="top-menu profile-menu hidden"><button onclick="showProfileInfo()">👤 Admin Profile</button><button onclick="appSettings()">⚙ Settings</button><button onclick="auditLogView()">▣ Audit Log</button><button onclick="appLogout()">↪ Logout</button></div>');}
+  renderNotifications();
+});
+
+/* Make new loan creation auditable and preserve existing workflow. */
+const _addLoanOriginal=addLoan;
+addLoan=function(e){
+  if(!guard(['Admin','Manager']))return;
+  e.preventDefault();const f=new FormData(e.target),customerId=f.get('customerId'),amount=+(f.get('amount')||0),rate=+(f.get('rate')||0),tenure=+(f.get('tenure')||1),interest=amount*rate/100,total=amount+interest,installment=total/tenure;
+  if(!customerId||!amount)return toast('Select a customer and enter loan amount');
+  const id='LN-'+String(data.loans.length+123).padStart(5,'0');
+  data.loans.push({id,customerId,amount,balance:total,interest,rate,interestType:f.get('interestType'),type:f.get('type'),tenure,start:f.get('start'),due:f.get('due'),frequency:f.get('frequency'),installment,status:'Active',payments:[],createdAt:profNow()});
+  const c=getCustomer(customerId);c.borrowed=(c.borrowed||0)+amount;c.balance=(c.balance||0)+total;save();audit('Loan created','Loan',id,`${c.name} · ${money(amount)} · ${tenure} ${f.get('frequency')}`);closeModal();toast('Loan created');render('loans');
+};
+
+/* Track expense creation through the existing expense form. */
+const _addExpenseOriginal=addExpense;
+addExpense=function(e){if(!guard(['Admin','Manager']))return;e.preventDefault();let f=new FormData(e.target);const rec={id:'EX-'+String((data.expenses||[]).length+1).padStart(4,'0'),category:f.get('category'),amount:+f.get('amount'),date:f.get('date')||today,mode:f.get('mode'),description:f.get('description'),createdAt:profNow()};data.expenses=data.expenses||[];data.expenses.push(rec);save();audit('Expense added','Expense',rec.id,`${rec.category} · ${money(rec.amount)} · ${rec.mode}`);closeModal();toast('Expense added');render('expenses');};
+
+/* Existing exports remain available; this adds an auditable professional backup. */
+const _exportBackupOriginal=exportBackup;
+exportBackup=function(){try{data.meta={...(data.meta||{}),exportedAt:profNow(),version:'FINOVA Professional'};audit('Backup exported','System','backup','Local JSON backup');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finova-professional-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}catch(e){toast('Backup failed');}};
