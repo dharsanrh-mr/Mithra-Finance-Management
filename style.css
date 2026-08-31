@@ -53,3 +53,23 @@
 .nav-item.active .nav-img-icon{opacity:1;filter:brightness(0) saturate(100%) invert(57%) sepia(72%) saturate(571%) hue-rotate(116deg) brightness(91%) contrast(86%)}
 .sidebar.collapsed .nav-img-icon{width:19px;height:19px}
 .nav-item{gap:12px}
+
+/* FIX: Keep the primary form modal centered; do not affect the cashbook modal. */
+#modal.modal{
+  position:fixed;
+  inset:0;
+  background:#10182788;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  z-index:30;
+}
+#modal.modal.hidden{display:none}
+#modal .modal-card{
+  width:min(680px,100%);
+  max-height:90vh;
+  overflow:auto;
+  background:#fff;
+  border-radius:16px;
+  padding:20px;
+}
