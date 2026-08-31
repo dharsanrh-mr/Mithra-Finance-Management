@@ -1488,4 +1488,112 @@ window.professionalCenter=professionalCenter;
   setInterval(()=>{ try{muInstallActionButton()}catch(e){} },5000);
   save();
 
+
+  /* ============================================================
+     MITHRA PREMIUM UX LAYER
+     Additive only — no existing page/function is replaced.
+     ============================================================ */
+  data.mithraPremium = data.mithraPremium || {pinned:[], recent:[], notifications:[]};
+  data.mithraPremium.pinned = Array.isArray(data.mithraPremium.pinned) ? data.mithraPremium.pinned : [];
+  data.mithraPremium.recent = Array.isArray(data.mithraPremium.recent) ? data.mithraPremium.recent : [];
+  save();
+
+  const mpEsc = v => esc(String(v ?? ''));
+  const mpPushRecent = (type,id,label)=>{
+    if(!id)return;
+    data.mithraPremium.recent=[{type,id,label,at:profNow()},...data.mithraPremium.recent.filter(x=>!(x.type===type&&x.id===id))].slice(0,12);
+    save();
+  };
+
+  window.mithraCommandPalette=function(){
+    openModal('Mithra Command Palette',`
+      <div class="mp-command">
+        <input id="mpCommandSearch" autofocus placeholder="Search customer, loan, receipt or action..." oninput="mithraCommandFilter(this.value)">
+        <div id="mpCommandResults" class="mp-command-results">
+          <button class="mp-command-item" onclick="mithraActionCenter()"><b>Action Center</b><small>Open today's actions</small></button>
+          <button class="mp-command-item" onclick="mithraBusinessSnapshot()"><b>Executive Snapshot</b><small>Business overview</small></button>
+          <button class="mp-command-item" onclick="mithraCashForecast()"><b>Cashflow Forecast</b><small>Expected cash movement</small></button>
+          <button class="mp-command-item" onclick="mithraDataHealth()"><b>Data Health</b><small>Find data-quality issues</small></button>
+          <button class="mp-command-item" onclick="mfsAccountingCenter()"><b>Accounting Center</b><small>Collections and expenses</small></button>
+          <button class="mp-command-item" onclick="mfsReminderCenter()"><b>Reminder Center</b><small>Due and follow-up queue</small></button>
+        </div>
+      </div>`);
+  };
+
+  window.mithraCommandFilter=function(q){
+    q=String(q||'').trim().toLowerCase();
+    const box=document.getElementById('mpCommandResults'); if(!box)return;
+    if(!q){
+      [...box.children].forEach(x=>x.style.display='');
+      return;
+    }
+    const items=[];
+    data.customers.forEach(c=>{if((c.name+' '+c.mobile+' '+c.id).toLowerCase().includes(q))items.push(`<button class="mp-command-item" onclick="openCustomer('${c.id}');mithraRecordRecent('Customer','${c.id}','${mpEsc(c.name)}')"><b>${mpEsc(c.name)}</b><small>Customer · ${mpEsc(c.mobile||c.id)}</small></button>`)});
+    data.loans.forEach(l=>{if((l.id+' '+(mpCust(l.customerId)?.name||'')).toLowerCase().includes(q))items.push(`<button class="mp-command-item" onclick="mfsLifecycleDetail('${l.id}');mithraRecordRecent('Loan','${l.id}','${mpEsc(l.id)}')"><b>${mpEsc(l.id)}</b><small>Loan · ${mpEsc(mpCust(l.customerId)?.name||'')}</small></button>`)});
+    data.payments.forEach(p=>{if((p.id+' '+p.loanId+' '+(p.ref||'')).toLowerCase().includes(q))items.push(`<button class="mp-command-item" onclick="mithraPaymentResult('${p.id}')"><b>${mpEsc(p.id)}</b><small>Payment · ${mpEsc(p.loanId||'')}</small></button>`)});
+    box.innerHTML=items.slice(0,12).join('')||'<div class="empty">No matching records</div>';
+  };
+
+  window.mithraPaymentResult=function(id){
+    const p=data.payments.find(x=>x.id===id); if(!p)return;
+    const l=muLoan(p.loanId), c=muCust(l?.customerId);
+    mpPushRecent('Payment',id,id);
+    openModal('Payment Details',`<div class="detail-list"><span>Receipt <b>${mpEsc(p.id)}</b></span><span>Date <b>${mpEsc(p.date)}</b></span><span>Customer <b>${mpEsc(c?.name||'-')}</b></span><span>Loan <b>${mpEsc(p.loanId||'-')}</b></span><span>Amount <b>${muMoney(p.amount)}</b></span><span>Mode <b>${mpEsc(p.mode||'-')}</b></span></div>`);
+  };
+
+  window.mithraRecordRecent=function(type,id,label){mpPushRecent(type,id,label);};
+
+  window.mithraRecentPinned=function(){
+    const pinned=data.mithraPremium.pinned, recent=data.mithraPremium.recent;
+    openModal('Quick Access',`
+      <h4>Pinned</h4>
+      <div class="mp-list">${pinned.map(x=>`<button class="mp-row" onclick="mithraOpenQuick('${x.type}','${x.id}')"><b>${mpEsc(x.label)}</b><small>${mpEsc(x.type)}</small></button>`).join('')||'<div class="empty">Nothing pinned</div>'}</div>
+      <h4 style="margin-top:18px">Recently Viewed</h4>
+      <div class="mp-list">${recent.map(x=>`<button class="mp-row" onclick="mithraOpenQuick('${x.type}','${x.id}')"><b>${mpEsc(x.label)}</b><small>${mpEsc(x.type)} · ${mpEsc(x.at)}</small></button>`).join('')||'<div class="empty">No recent records</div>'}</div>`);
+  };
+
+  window.mithraOpenQuick=function(type,id){
+    if(type==='Customer')return openCustomer(id);
+    if(type==='Loan')return mfsLifecycleDetail(id);
+    if(type==='Payment')return mithraPaymentResult(id);
+  };
+
+  window.mithraPin=function(type,id,label){
+    const p=data.mithraPremium.pinned;
+    const i=p.findIndex(x=>x.type===type&&x.id===id);
+    if(i>=0)p.splice(i,1); else p.unshift({type,id,label});
+    data.mithraPremium.pinned=p.slice(0,20); save(); toast(i>=0?'Removed from pinned':'Pinned');
+  };
+
+  function mpInstallTopTools(){
+    const top=document.querySelector('.top-actions');
+    if(top&&!top.querySelector('[data-mithra-premium-tools]')){
+      const wrap=document.createElement('div');
+      wrap.dataset.mithraPremiumTools='1';
+      wrap.className='mp-top-tools';
+      wrap.innerHTML=`<button class="icon-btn" title="Command Palette" onclick="mithraCommandPalette()">⌘</button><button class="icon-btn" title="Quick Access" onclick="mithraRecentPinned()">★</button>`;
+      top.insertBefore(wrap,top.firstChild);
+    }
+  }
+  setTimeout(mpInstallTopTools,300);
+  setInterval(()=>{try{mpInstallTopTools()}catch(e){}},5000);
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){ try{closeModal()}catch(x){} }
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();mithraCommandPalette();}
+    if(e.key==='/' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){e.preventDefault();document.getElementById('globalSearch')?.focus();}
+  });
+
+  /* Keep existing page structure; add non-invasive status class hooks to existing badges. */
+  function mpPolishStatuses(){
+    document.querySelectorAll('.badge,.status,.pill').forEach(el=>{
+      if(el.dataset.mithraPolished)return;
+      el.dataset.mithraPolished='1';
+      el.classList.add('mp-status');
+    });
+  }
+  setTimeout(mpPolishStatuses,500);
+  setInterval(()=>{try{mpPolishStatuses()}catch(e){}},5000);
+  save();
+
 })();

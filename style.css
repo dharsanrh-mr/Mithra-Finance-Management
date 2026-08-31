@@ -433,3 +433,20 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
 .modal-backdrop>.modal .form-grid{padding:20px 20px 0}
 .modal-backdrop>.modal .modal-actions{border-top:1px solid #edf1f5;margin:20px 0 0;padding:14px 20px;background:#fafcfd}
 @media(max-width:520px){#modal #modalBody{padding:16px}#modal .modal-head{padding:14px 16px}#modal .form-actions{margin:16px -16px -16px;padding:12px 16px}.report-summary-grid{grid-template-columns:1fr}.toast{left:10px;right:10px;bottom:10px;max-width:none}}
+
+/* ============================================================
+   MITHRA PREMIUM UX — additive styling only
+   ============================================================ */
+.mp-top-tools{display:flex;gap:6px;align-items:center}
+.mp-command{display:flex;flex-direction:column;gap:12px}
+.mp-command input{width:100%;box-sizing:border-box}
+.mp-command-results,.mp-list{display:flex;flex-direction:column;gap:7px;max-height:420px;overflow:auto}
+.mp-command-item,.mp-row{
+  width:100%;text-align:left;border:1px solid var(--border,#e5e7eb);
+  background:var(--card,#fff);border-radius:10px;padding:11px 13px;
+  cursor:pointer;display:flex;flex-direction:column;gap:3px;
+}
+.mp-command-item:hover,.mp-row:hover{filter:brightness(.98);transform:translateY(-1px)}
+.mp-command-item small,.mp-row small{opacity:.65}
+.mp-status{transition:transform .15s ease,filter .15s ease}
+.mp-status:hover{transform:translateY(-1px)}
