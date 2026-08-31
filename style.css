@@ -369,3 +369,67 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
 
 /* FINOVA Professional Pack - functionality support only */
 .closing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}.closing-grid>div{border:1px solid #e5ebf0;background:#f8fafb;border-radius:9px;padding:12px}.closing-grid span{display:block;color:#7c8999;font-size:9px;margin-bottom:5px}.closing-grid b{font-size:14px;color:#1d2f49}.followup-history{display:grid;gap:9px}.followup-item{border:1px solid #e4eaf0;border-radius:9px;padding:11px;background:#fff}.followup-item>div{display:flex;justify-content:space-between;gap:10px}.followup-item b{font-size:11px}.followup-item small{font-size:9px;color:#7c8999}.followup-item p{font-size:10px;color:#53657b;margin:7px 0 0;white-space:pre-wrap}.status.pending{background:#eef2f6;color:#66768a}.status.contacted{background:#eef5ff;color:#4d73a8}.status.promised{background:#fff5dc;color:#9b6900}.status.done{background:#e9f8f1;color:#138d59}@media(max-width:800px){.closing-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.closing-grid{grid-template-columns:1fr}}
+
+/* FINOVA UI-matched dialogs — visual refinement only; no page layout changes. */
+#modal.modal{background:rgba(16,24,39,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#modal .modal-card{background:#fff;border:1px solid #e4eaf1;border-radius:18px;padding:0;box-shadow:0 22px 60px rgba(21,32,54,.20);overflow:hidden}
+#modal .modal-head{margin:0;padding:17px 20px 14px;border-bottom:1px solid #edf1f5;background:#fff;position:sticky;top:0;z-index:3}
+#modal .modal-head h3{font-size:16px;color:#1b2a41;letter-spacing:-.1px}
+#modal .modal-head button{width:34px;height:34px;border-radius:9px;background:#f3f6f9;color:#637188;font-size:22px;display:grid;place-items:center;line-height:1}
+#modal .modal-head button:hover{background:#eaf7f1;color:#159663}
+#modal #modalBody{padding:20px}
+#modal #modalBody>.form-grid:first-child{margin-top:0}
+#modal .field label,#modal .form-grid>label{font-weight:600;color:#68778b}
+#modal input,#modal select,#modal textarea{border-color:#dfe6ee;background:#fbfcfd;border-radius:10px;transition:border-color .15s,box-shadow .15s,background .15s}
+#modal input:focus,#modal select:focus,#modal textarea:focus{border-color:#20b879;background:#fff;box-shadow:0 0 0 3px rgba(32,184,121,.10)}
+#modal .form-actions{border-top:1px solid #edf1f5;margin:20px -20px -20px;padding:14px 20px;background:#fafcfd}
+#modal .btn{border-radius:10px;min-height:40px}
+#modal .btn.green{box-shadow:0 4px 12px rgba(31,172,112,.16)}
+#modal .btn.red{background:#d84d5b}
+#modal .section{border-color:#e5eaf1;box-shadow:none}
+.confirm-dialog,.prompt-dialog{padding:2px 0 0}
+.confirm-icon{width:46px;height:46px;border-radius:13px;background:#fff3df;color:#aa6a00;display:grid;place-items:center;font-size:21px;font-weight:800;margin:0 auto 12px}
+.confirm-message,.prompt-message{text-align:center;color:#53657b;font-size:12px;line-height:1.6;margin:0 auto;max-width:520px}
+.confirm-dialog .form-actions{margin-top:20px}
+.prompt-dialog .field{margin-top:16px}
+.report-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.report-summary-grid>div{background:#f7f9fb;border:1px solid #e7edf2;border-radius:11px;padding:13px}
+.report-summary-grid span{display:block;color:#7b889b;font-size:10px}
+.report-summary-grid b{display:block;color:#1d2f49;font-size:17px;margin-top:5px}
+.toast{right:20px;bottom:20px;display:flex;align-items:center;gap:9px;background:#17243a;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(16,24,39,.20);border-radius:12px;padding:11px 14px;font-size:12px;max-width:min(380px,calc(100vw - 30px))}
+.toast-dot{width:22px;height:22px;border-radius:7px;background:#1fac70;display:grid;place-items:center;font-size:12px;font-weight:800;flex:0 0 auto}
+.modal-backdrop{background:rgba(16,24,39,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:1000}
+.modal-backdrop>.modal{background:#fff;border:1px solid #e4eaf1;border-radius:18px;box-shadow:0 22px 60px rgba(21,32,54,.20);padding:0;overflow:hidden}
+.modal-backdrop>.modal .modal-head{padding:17px 20px 14px;border-bottom:1px solid #edf1f5;background:#fff}
+.modal-backdrop>.modal .form-grid{padding:20px 20px 0}
+.modal-backdrop>.modal .modal-actions{border-top:1px solid #edf1f5;margin:20px 0 0;padding:14px 20px;background:#fafcfd}
+@media(max-width:520px){#modal #modalBody{padding:16px}#modal .modal-head{padding:14px 16px}#modal .form-actions{margin:16px -16px -16px;padding:12px 16px}.report-summary-grid{grid-template-columns:1fr}.toast{left:10px;right:10px;bottom:10px;max-width:none}}
+
+/* FINOVA UI-matched dialogs — visual refinement only; no page layout changes. */
+#modal.modal{background:rgba(16,24,39,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#modal .modal-card{background:#fff;border:1px solid #e4eaf1;border-radius:18px;padding:0;box-shadow:0 22px 60px rgba(21,32,54,.20);overflow:hidden}
+#modal .modal-head{margin:0;padding:17px 20px 14px;border-bottom:1px solid #edf1f5;background:#fff;position:sticky;top:0;z-index:3}
+#modal .modal-head h3{font-size:16px;color:#1b2a41;letter-spacing:-.1px}
+#modal .modal-head button{width:34px;height:34px;border-radius:9px;background:#f3f6f9;color:#637188;font-size:22px;display:grid;place-items:center;line-height:1}
+#modal .modal-head button:hover{background:#eaf7f1;color:#159663}
+#modal #modalBody{padding:20px}
+#modal .field label,#modal .form-grid>label{font-weight:600;color:#68778b}
+#modal input,#modal select,#modal textarea{border-color:#dfe6ee;background:#fbfcfd;border-radius:10px;transition:border-color .15s,box-shadow .15s,background .15s}
+#modal input:focus,#modal select:focus,#modal textarea:focus{border-color:#20b879;background:#fff;box-shadow:0 0 0 3px rgba(32,184,121,.10)}
+#modal .form-actions{border-top:1px solid #edf1f5;margin:20px -20px -20px;padding:14px 20px;background:#fafcfd}
+#modal .btn{border-radius:10px;min-height:40px}
+.confirm-dialog,.prompt-dialog{padding:2px 0 0}
+.confirm-icon{width:46px;height:46px;border-radius:13px;background:#fff3df;color:#aa6a00;display:grid;place-items:center;font-size:21px;font-weight:800;margin:0 auto 12px}
+.confirm-message,.prompt-message{text-align:center;color:#53657b;font-size:12px;line-height:1.6;margin:0 auto;max-width:520px}
+.prompt-dialog .field{margin-top:16px}
+.report-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.report-summary-grid>div{background:#f7f9fb;border:1px solid #e7edf2;border-radius:11px;padding:13px}
+.report-summary-grid span{display:block;color:#7b889b;font-size:10px}.report-summary-grid b{display:block;color:#1d2f49;font-size:17px;margin-top:5px}
+.toast{right:20px;bottom:20px;display:flex;align-items:center;gap:9px;background:#17243a;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(16,24,39,.20);border-radius:12px;padding:11px 14px;font-size:12px;max-width:min(380px,calc(100vw - 30px))}
+.toast-dot{width:22px;height:22px;border-radius:7px;background:#1fac70;display:grid;place-items:center;font-size:12px;font-weight:800;flex:0 0 auto}
+.modal-backdrop{background:rgba(16,24,39,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:1000}
+.modal-backdrop>.modal{background:#fff;border:1px solid #e4eaf1;border-radius:18px;box-shadow:0 22px 60px rgba(21,32,54,.20);padding:0;overflow:hidden}
+.modal-backdrop>.modal .modal-head{padding:17px 20px 14px;border-bottom:1px solid #edf1f5;background:#fff}
+.modal-backdrop>.modal .form-grid{padding:20px 20px 0}
+.modal-backdrop>.modal .modal-actions{border-top:1px solid #edf1f5;margin:20px 0 0;padding:14px 20px;background:#fafcfd}
+@media(max-width:520px){#modal #modalBody{padding:16px}#modal .modal-head{padding:14px 16px}#modal .form-actions{margin:16px -16px -16px;padding:12px 16px}.report-summary-grid{grid-template-columns:1fr}.toast{left:10px;right:10px;bottom:10px;max-width:none}}

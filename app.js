@@ -41,7 +41,7 @@ function render(p,q=""){
   (views[p]||dashboard)(q);
 }
 function dashboard(){let active=data.loans.filter(l=>l.status==="Active"||l.status==="Overdue").length,dis=data.loans.reduce((a,l)=>a+l.amount,0),out=data.loans.reduce((a,l)=>a+l.balance,0),col=data.payments.filter(p=>p.date===today).reduce((a,p)=>a+p.amount,0),over=data.loans.filter(l=>l.status==="Overdue"),due=data.loans.filter(l=>l.status==="Active");
-page.innerHTML=title("Dashboard","Complete finance overview for today",`<button class="btn green" onclick="openCustomer()">+ New Customer</button><button class="btn" onclick="openLoan()">+ New Loan</button><button class="btn light" onclick="openPayment()">Collect Payment</button>`)+
+page.innerHTML=title("Dashboard","Complete finance overview for today",`<button class="btn green" onclick="openCustomer()">+ New Customer</button><button class="btn" onclick="openLoan()">+ New Loan</button><button class="btn light" onclick="openCollectionPicker()">Collect Payment</button>`)+
 `<div class="cards">
 <div class="card metric"><div><div class="label">Today's Collection</div><div class="value">${money(col)}</div><div class="sub">↑ Payments received</div></div><div class="metric-icon">↙</div></div>
 <div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(16500)}</div><div class="sub">Collection target</div></div><div class="metric-icon">◷</div></div>
@@ -215,7 +215,7 @@ function openCollectionPicker(){
   const loans=data.loans.filter(l=>l.balance>0);
   openModal("Select Loan",`<div class="collection-picker">${loans.length?loans.map(l=>{const c=getCustomer(l.customerId);return `<button class="picker-row" onclick="openPayment('${l.id}')"><span><b>${c?.name||"Customer"}</b><small>${l.id} · Outstanding ${money(l.balance)}</small></span><strong>Collect</strong></button>`}).join(""):`<div class="empty">No active loan with outstanding balance</div>`}</div>`);
 }
-function dues(){let over=data.loans.filter(l=>l.status==="Overdue"),up=data.loans.filter(l=>l.status==="Active");page.innerHTML=title("Due Management","Today's due, upcoming due and overdue follow-up",`<button class="btn green" onclick="openPayment()">Collect Payment</button>`)+`<div class="cards"><div class="card"><div class="label">Today's Due</div><div class="value">${money(16500)}</div></div><div class="card"><div class="label">Upcoming Loans</div><div class="value">${up.length}</div></div><div class="card"><div class="label">Overdue</div><div class="value">${over.length}</div></div><div class="card"><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((a,l)=>a+l.balance,0))}</div></div></div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Overdue Follow-up</h3></div>${loanTable(over)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Upcoming / Due</h3></div>${loanTable(up)}</div>`}
+function dues(){let over=data.loans.filter(l=>l.status==="Overdue"),up=data.loans.filter(l=>l.status==="Active");page.innerHTML=title("Due Management","Today's due, upcoming due and overdue follow-up",`<button class="btn green" onclick="openCollectionPicker()">Collect Payment</button>`)+`<div class="cards"><div class="card"><div class="label">Today's Due</div><div class="value">${money(16500)}</div></div><div class="card"><div class="label">Upcoming Loans</div><div class="value">${up.length}</div></div><div class="card"><div class="label">Overdue</div><div class="value">${over.length}</div></div><div class="card"><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((a,l)=>a+l.balance,0))}</div></div></div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Overdue Follow-up</h3></div>${loanTable(over)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Upcoming / Due</h3></div>${loanTable(up)}</div>`}
 function cashbookModeTotals(){
   const todayPays=data.payments.filter(p=>p.date===today);
   const cash=todayPays.filter(p=>(p.mode||"Cash").toLowerCase()==="cash").reduce((a,p)=>a+Number(p.amount||0),0);
@@ -277,18 +277,19 @@ function cashbookCloseDay(){
   const cashExp=expenses.filter(x=>(x.mode||"Cash").toLowerCase()==="cash").reduce((a,x)=>a+Number(x.amount||0),0);
   const opening=Number(data.settings?.openingCash||50000);
   const expected=opening+totals.cash-cashExp;
-  const actual=prompt(`Expected cash: ${money(expected)}\nEnter actual cash counted:`);
-  if(actual===null)return;
-  const n=Number(actual); if(isNaN(n))return toast("Invalid cash amount");
-  data.cashClosings=data.cashClosings||[];
-  data.cashClosings.push({date:today,opening,cashCollection:totals.cash,cashExpense:cashExp,expected,actual:n,difference:n-expected});
-  saveData(); cashbook(); toast("Day closing saved");
+  styledPrompt("Actual Cash Counted", `Expected cash: ${money(expected)}`, String(expected), actual=>{
+    if(actual===null)return;
+    const n=Number(actual); if(isNaN(n))return toast("Invalid cash amount");
+    data.cashClosings=data.cashClosings||[];
+    data.cashClosings.push({date:today,opening,cashCollection:totals.cash,cashExpense:cashExp,expected,actual:n,difference:n-expected});
+    saveData(); cashbook(); toast("Day closing saved");
+  });
 }
 function cashbookReport(){
   const rows=cashbookTransactions("all");
   const totalIn=rows.filter(r=>r.type==="Collection").reduce((a,r)=>a+r.amount,0);
   const totalOut=rows.filter(r=>r.type==="Expense").reduce((a,r)=>a+r.amount,0);
-  alert(`Cashbook Report\n\nCollections: ${money(totalIn)}\nExpenses: ${money(totalOut)}\nNet Movement: ${money(totalIn-totalOut)}\nTransactions: ${rows.length}`);
+  openModal("Cashbook Report", `<div class="report-summary-grid"><div><span>Collections</span><b class="positive">${money(totalIn)}</b></div><div><span>Expenses</span><b class="negative">${money(totalOut)}</b></div><div><span>Net Movement</span><b>${money(totalIn-totalOut)}</b></div><div><span>Transactions</span><b>${rows.length}</b></div></div><div class="form-actions"><button class="btn light" onclick="closeModal()">Close</button><button class="btn green" onclick="printCurrentModal()">Print</button></div>`);
 }
 function cashbook(){
   data.expenses=data.expenses||[];
@@ -513,7 +514,7 @@ function importBackup(){
   input.onchange=()=>{const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);const d=p.data||p;if(!d.customers||!d.loans||!d.payments)throw new Error("Invalid FINOVA backup");data=d;data.settings=(data.settings&&typeof data.settings==="object")?data.settings:{};saveData();toast("Backup restored");appSettings()}catch(e){toast("Invalid backup file")}};r.readAsText(f)};input.click();
 }
 function resetDemoConfirm(){
-  if(confirm("Reset all local demo data? This cannot be undone.")){localStorage.removeItem(KEY);localStorage.removeItem(SETTINGS_KEY);location.reload();}
+  styledConfirm("Reset Demo Data", "All local demo data will be removed. This action cannot be undone.", ()=>{localStorage.removeItem(KEY);localStorage.removeItem(SETTINGS_KEY);location.reload();});
 }
 function openCustomer(){
   openModal("Add Customer",`<form onsubmit="addCustomer(event)">
@@ -652,6 +653,7 @@ function saveLoanEdit(e,id){
   e.preventDefault();const l=data.loans.find(x=>x.id===id),f=new FormData(e.target);l.due=f.get("due");l.status=f.get("status");l.frequency=f.get("frequency");if(l.balance<=0)l.status="Closed";save();closeModal();toast("Loan updated");render("loans");
 }
 function openPayment(loanId){
+  if(!loanId){openCollectionPicker();return;}
   const l=data.loans.find(x=>x.id===loanId),c=getCustomer(l?.customerId);if(!l||!c)return;
   openModal("Collect Payment",`<form onsubmit="collectPayment(event,'${loanId}')">
     <div class="payment-summary"><div><span>Customer</span><b>${c.name}</b></div><div><span>Loan</span><b>${l.id}</b></div><div><span>Outstanding</span><b>${money(l.balance)}</b></div></div>
@@ -735,8 +737,12 @@ function whatsappCustomer(id){
   const text=encodeURIComponent(`Hello ${c.name}, this is FINOVA FINANCE. Your current outstanding amount is ${money(c.balance)}${l?`. Your loan ${l.id} due amount is ${money(Math.min(l.balance,5000))} on ${l.due}.`:"."}`);
   window.open(`https://wa.me/${String(c.mobile||"").replace(/\D/g,"")}?text=${text}`,"_blank");
 }
-function openModal(t,b){document.getElementById("modalTitle").textContent=t;document.getElementById("modalBody").innerHTML=b;document.getElementById("modal").classList.remove("hidden")}function closeModal(){document.getElementById("modal").classList.add("hidden")}
-function toast(t){let x=document.createElement("div");x.className="toast";x.textContent=t;document.body.appendChild(x);setTimeout(()=>x.remove(),2200)}
+function openModal(t,b){document.getElementById("modalTitle").textContent=t;document.getElementById("modalBody").innerHTML=b;document.getElementById("modal").classList.remove("hidden")}
+function closeModal(){document.getElementById("modal").classList.add("hidden")}
+function styledConfirm(title,message,onYes){openModal(title,`<div class="confirm-dialog"><div class="confirm-icon">!</div><p class="confirm-message">${esc(message)}</p><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button type="button" class="btn red" id="confirmAction">Confirm</button></div></div>`);document.getElementById("confirmAction")?.addEventListener("click",()=>{closeModal();onYes?.()},{once:true})}
+function styledPrompt(title,message,value,onDone){openModal(title,`<div class="prompt-dialog"><p class="prompt-message">${esc(message)}</p><div class="field"><label>Value</label><input id="styledPromptValue" value="${esc(value??"")}" autocomplete="off"></div><div class="form-actions"><button type="button" class="btn light" id="promptCancel">Cancel</button><button type="button" class="btn green" id="promptAction">Save</button></div></div>`);const input=document.getElementById("styledPromptValue");input?.focus();document.getElementById("promptCancel")?.addEventListener("click",()=>{closeModal();onDone(null)},{once:true});document.getElementById("promptAction")?.addEventListener("click",()=>{const v=input?.value??"";closeModal();onDone(v)},{once:true})}
+function printCurrentModal(){const card=document.querySelector('#modal .modal-card');if(!card)return;const w=window.open('','_blank','width=900,height=700');if(!w)return;w.document.write('<html><head><title>FINOVA Report</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#152036}.report-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.report-summary-grid div{border:1px solid #e5eaf1;border-radius:12px;padding:16px}.report-summary-grid span{display:block;color:#7b889b;font-size:12px}.report-summary-grid b{display:block;font-size:20px;margin-top:6px}</style></head><body>'+card.innerHTML+'</body></html>');w.document.close();w.focus();w.print()}
+function toast(t){let x=document.createElement("div");x.className="toast";x.innerHTML='<span class="toast-dot">✓</span><span>'+esc(t)+'</span>';document.body.appendChild(x);setTimeout(()=>x.remove(),2200)}
 function exportData(){let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="finova-v2-backup.json";a.click()}
 function resetData(){if(confirm("Reset demo data?")){localStorage.removeItem(KEY);location.reload()}}
 try{render("dashboard")}catch(err){console.error(err);document.getElementById("page").innerHTML=`<div class="card error-card"><h2>FINOVA could not load</h2><p>Saved data was incompatible. Reset the demo data and reload.</p><button class="btn green" onclick="resetData()">Reset Demo Data</button><button class="btn light" onclick="location.reload()">Reload</button><pre>${String(err.message||err)}</pre></div>`}
@@ -822,7 +828,7 @@ function showProfileInfo(){
 }
 function appLogout(){
   closeTopMenus();
-  if(confirm('Logout from FINOVA on this device?')) toast('Logged out');
+  styledConfirm('Logout', 'Do you want to logout from FINOVA on this device?', ()=>toast('Logged out'));
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -922,7 +928,7 @@ function professionalDues(){
   refreshLoanStatuses();
   const over=overdueLoans(), todayLoans=data.loans.filter(l=>l.balance>0&&l.due===today), upcoming=data.loans.filter(l=>l.balance>0&&l.due>today).sort((a,b)=>a.due.localeCompare(b.due));
   const promised=(data.followUps||[]).filter(x=>x.status==='Promised'&&x.date>=today).length;
-  page.innerHTML=title('Due Management','Today, upcoming and overdue collection workflow',`<button class="btn green" onclick="openPayment()">Collect Payment</button><button class="btn light" onclick="exportProfessionalCSV('loans')">Export Loans</button>`)+
+  page.innerHTML=title('Due Management','Today, upcoming and overdue collection workflow',`<button class="btn green" onclick="openCollectionPicker()">Collect Payment</button><button class="btn light" onclick="exportProfessionalCSV('loans')">Export Loans</button>`)+
   `<div class="cards"><div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(dueAmountToday())}</div><div class="sub">${todayLoans.length} loans</div></div><div class="metric-icon">◷</div></div>
   <div class="card metric"><div><div class="label">Upcoming</div><div class="value">${upcoming.length}</div><div class="sub">Future installments</div></div><div class="metric-icon">→</div></div>
   <div class="card metric"><div><div class="label">Overdue</div><div class="value">${money(over.reduce((s,l)=>s+l.balance,0))}</div><div class="sub">${over.length} loans</div></div><div class="metric-icon">!</div></div>
@@ -956,7 +962,7 @@ function collectPaymentPro(e,loanId){
   if(l.balance<=0){l.status='Closed';l.due='';}
   save();audit('Payment collected','Payment',id,`${c.name} · ${money(amount)} · ${p.mode} · ${l.id}`);closeModal();toast('Payment saved · '+id);receipt(id);render('collections');
 }
-openPayment=openPaymentPro; collectPayment=collectPaymentPro;
+openPayment=function(loanId){ if(!loanId){ openCollectionPicker(); return; } return openPaymentPro(loanId); }; collectPayment=collectPaymentPro; window.openPayment=openPayment;
 
 function receiptPro(id){
   const p=data.payments.find(x=>x.id===id);if(!p)return;const c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);if(!c||!l)return;
@@ -1010,7 +1016,7 @@ function dashboardPro(){
   refreshLoanStatuses();
   const active=data.loans.filter(l=>l.balance>0).length,dis=data.loans.reduce((s,l)=>s+Number(l.amount||0),0),out=data.loans.reduce((s,l)=>s+Number(l.balance||0),0),col=data.payments.filter(p=>p.date===today).reduce((s,p)=>s+Number(p.amount||0),0),over=overdueLoans(),due=data.loans.filter(l=>l.balance>0&&l.due===today),target=dueAmountToday(),rate=target?Math.round(col/target*100):0;
   const month=new Date(today);month.setDate(1);const monthStart=month.toISOString().slice(0,10);const monthCol=data.payments.filter(p=>p.date>=monthStart&&p.date<=today).reduce((s,p)=>s+Number(p.amount||0),0);const monthExp=(data.expenses||[]).filter(e=>e.date>=monthStart&&e.date<=today).reduce((s,e)=>s+Number(e.amount||0),0);
-  page.innerHTML=title('Dashboard','Complete finance overview for today',`<button class="btn green" onclick="openCustomer()">+ New Customer</button><button class="btn" onclick="openLoan()">+ New Loan</button><button class="btn light" onclick="openPayment()">Collect Payment</button>`)+
+  page.innerHTML=title('Dashboard','Complete finance overview for today',`<button class="btn green" onclick="openCustomer()">+ New Customer</button><button class="btn" onclick="openLoan()">+ New Loan</button><button class="btn light" onclick="openCollectionPicker()">Collect Payment</button>`)+
   `<div class="cards"><div class="card metric"><div><div class="label">Today's Collection</div><div class="value">${money(col)}</div><div class="sub">↑ Payments received</div></div><div class="metric-icon">↙</div></div><div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(target)}</div><div class="sub">${rate}% collection efficiency</div></div><div class="metric-icon">◷</div></div><div class="card metric"><div><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((s,l)=>s+l.balance,0))}</div><div class="sub" style="color:#d34d59">${over.length} loans need follow-up</div></div><div class="metric-icon">!</div></div><div class="card metric"><div><div class="label">New Loans</div><div class="value">${data.loans.filter(l=>(l.createdAt||l.start||'')>=monthStart).length}</div><div class="sub">This month</div></div><div class="metric-icon">▣</div></div></div>
   <div class="cards" style="margin-top:14px"><div class="card"><div class="label">Active Customers</div><div class="value">${data.customers.filter(c=>c.balance>0).length}</div></div><div class="card"><div class="label">Total Disbursed</div><div class="value">${money(dis)}</div></div><div class="card"><div class="label">Outstanding</div><div class="value">${money(out)}</div></div><div class="card"><div class="label">Month Net Movement</div><div class="value">${money(monthCol-monthExp)}</div></div></div>
   <div class="layout2"><div class="section"><div class="section-head"><h3>Collection Performance</h3><span class="muted">Today vs target</span></div><div class="progress-track" style="height:14px;margin:20px 0"><div class="progress-fill" style="width:${Math.min(100,rate)}%"></div></div><div class="kpis"><div class="kpi"><span>Collected</span><b>${money(col)}</b></div><div class="kpi"><span>Target</span><b>${money(target)}</b></div><div class="kpi"><span>Efficiency</span><b>${rate}%</b></div></div></div><div class="section"><div class="section-head"><h3>Money Position</h3><span class="muted">Today</span></div>${(()=>{const pays=data.payments.filter(p=>p.date===today);const ex=(data.expenses||[]).filter(e=>e.date===today);const modes=['Cash','UPI','Bank'];return `<div class="kpis">${modes.map(m=>{const v=pays.filter(p=>(p.mode||'').toLowerCase()===m.toLowerCase()).reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="kpi"><span>${m}</span><b>${money(v)}</b></div>`}).join('')}</div>`})()}</div></div>
@@ -1086,7 +1092,7 @@ function addPdc(){
   openModal('Add PDC / Cheque',`<form onsubmit="savePdc(event)"><div class="form-grid"><label>Customer<select name="customerId" required>${data.customers.map(c=>`<option value="${c.id}">${esc(c.name)} · ${esc(c.mobile||'')}</option>`).join('')}</select></label><label>Loan<select name="loanId">${data.loans.map(l=>`<option value="${l.id}">${l.id}</option>`).join('')}</select></label><label>Cheque Number<input name="chequeNo" required></label><label>Bank<input name="bank"></label><label>Amount<input name="amount" type="number" required></label><label>Due Date<input name="dueDate" type="date" value="${today}" required></label></div><div class="form-actions"><button type="button" class="btn light" onclick="pdcManager()">Cancel</button><button class="btn green">Save PDC</button></div></form>`)
 }
 function savePdc(e){e.preventDefault();const f=new FormData(e.target),x={id:'PDC-'+Date.now(),customerId:f.get('customerId'),loanId:f.get('loanId'),chequeNo:f.get('chequeNo'),bank:f.get('bank'),amount:+f.get('amount')||0,dueDate:f.get('dueDate'),status:'Pending',createdAt:profNow()};data.pdc.unshift(x);save();audit('PDC added','PDC',x.id,`${x.chequeNo} · ${money(x.amount)}`);toast('PDC saved');pdcManager()}
-function updatePdc(id){const x=data.pdc.find(p=>p.id===id);if(!x)return;const status=prompt('Status: Pending / Deposited / Cleared / Returned',x.status);if(status&&['Pending','Deposited','Cleared','Returned'].includes(status)){x.status=status;save();audit('PDC status updated','PDC',id,status);pdcManager()}}
+function updatePdc(id){const x=data.pdc.find(p=>p.id===id);if(!x)return;styledPrompt('Update PDC Status','Enter: Pending / Deposited / Cleared / Returned',x.status,status=>{if(status&&['Pending','Deposited','Cleared','Returned'].includes(status)){x.status=status;save();audit('PDC status updated','PDC',id,status);pdcManager()}else if(status!==null){toast('Invalid PDC status')}})}
 function guarantorManager(){
   openModal('Guarantors',`<div class="section-head"><h3>Guarantor Registry</h3><button class="btn green" onclick="addGuarantor()">+ Add Guarantor</button></div><div class="table-scroll"><table class="table"><thead><tr><th>NAME</th><th>MOBILE</th><th>RELATION</th><th>LINKED LOANS</th></tr></thead><tbody>${data.guarantors.map(g=>`<tr><td><b>${esc(g.name)}</b></td><td>${esc(g.mobile||'-')}</td><td>${esc(g.relation||'-')}</td><td>${data.loans.filter(l=>l.guarantorId===g.id).length}</td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">No guarantors</div></td></tr>'}</tbody></table></div>`)
 }
@@ -1105,7 +1111,7 @@ function lockManager(){
 function toggleMonthLock(m){if(data.monthLocks[m]){if(!guard(['Admin']))return;delete data.monthLocks[m];audit('Month unlocked','System',m,'Period reopened')}else{if(!guard(['Admin','Manager']))return;data.monthLocks[m]=true;audit('Month locked','System',m,'Period locked')}save();lockManager()}
 function recycleManager(){openModal('Recycle Bin',`<div class="section-head"><h3>Deleted Records</h3><button class="btn danger-btn" onclick="emptyRecycleBin()">Empty Bin</button></div><div class="table-scroll"><table class="table"><thead><tr><th>TYPE</th><th>ID</th><th>DELETED</th><th></th></tr></thead><tbody>${data.recycleBin.map(x=>`<tr><td>${esc(x.type)}</td><td>${esc(x.id)}</td><td>${esc(x.deletedAt||'')}</td><td><button class="mini-btn" onclick="restoreRecycle('${x.recycleId}')">Restore</button></td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">Recycle bin empty</div></td></tr>'}</tbody></table></div>`)}
 function restoreRecycle(id){const x=data.recycleBin.find(r=>r.recycleId===id);if(!x)return;data[x.type+'s']=data[x.type+'s']||[];data[x.type+'s'].push(x.record);data.recycleBin=data.recycleBin.filter(r=>r.recycleId!==id);save();audit('Record restored','Recycle Bin',id,x.type);toast('Record restored');recycleManager()}
-function emptyRecycleBin(){if(!guard(['Admin']))return;if(confirm('Empty recycle bin?')){data.recycleBin=[];save();audit('Recycle bin emptied','System','recycle','All deleted records removed');recycleManager()}}
+function emptyRecycleBin(){if(!guard(['Admin']))return;styledConfirm('Empty Recycle Bin','All deleted records will be permanently removed.',()=>{data.recycleBin=[];save();audit('Recycle bin emptied','System','recycle','All deleted records removed');recycleManager()})}
 function systemHealth(){const raw=JSON.stringify(data), bytes=new Blob([raw]).size, lastBackup=data.meta?.exportedAt||'Never', integrity=data.customers.every(c=>c.id&&c.name)&&data.loans.every(l=>l.id&&l.customerId&&Number.isFinite(Number(l.balance)));openModal('System Health',`<div class="detail-list"><span>Data integrity <b>${integrity?'OK':'Needs review'}</b></span><span>Customers <b>${data.customers.length}</b></span><span>Loans <b>${data.loans.length}</b></span><span>Payments <b>${data.payments.length}</b></span><span>Expenses <b>${data.expenses.length}</b></span><span>Storage <b>${(bytes/1024).toFixed(1)} KB</b></span><span>Last backup <b>${esc(lastBackup)}</b></span><span>Branch count <b>${data.branches.length}</b></span></div>`)}
 function exportProfessionalPlus(){data.meta={...(data.meta||{}),exportedAt:profNow(),version:'FINOVA Professional+'};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finova-professional-plus-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);toast('Professional+ backup exported')}
 
