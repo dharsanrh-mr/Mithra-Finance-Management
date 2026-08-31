@@ -1222,3 +1222,150 @@ professionalCenter=function(){
   setTimeout(()=>{const a=document.querySelector('.pro-center .data-actions');if(a&&!a.querySelector('[data-branch]'))a.insertAdjacentHTML('beforeend','<button class="btn" data-branch onclick="branchManager()">Branches</button>')},0);
 };
 window.professionalCenter=professionalCenter;
+/* =========================================================
+   Mithra Finance System PROFESSIONAL+ Control Pack 2
+   Additive functionality only. Existing visual layout preserved.
+   ========================================================= */
+(function(){
+  const ensure=()=>{
+    data.followUps=data.followUps||[]; data.auditLog=data.auditLog||[]; data.cashClosings=data.cashClosings||[];
+    data.pdc=data.pdc||[]; data.guarantors=data.guarantors||[]; data.documents=data.documents||[];
+    data.recycleBin=data.recycleBin||[]; data.branches=data.branches||[{id:'BR-001',name:'Main Branch',active:true}];
+    data.targets=data.targets||{}; data.monthLocks=data.monthLocks||{}; data.users=data.users||[{id:'USR-001',name:'Admin',role:'Admin',active:true}];
+    data.approvals=data.approvals||[]; data.communications=data.communications||[]; data.loanProducts=data.loanProducts||[];
+    data.importLog=data.importLog||[]; data.systemFlags=data.systemFlags||[]; data.routePlans=data.routePlans||{};
+    data.settings=data.settings||{};
+    if(!Number.isFinite(Number(data.settings.approvalThreshold))) data.settings.approvalThreshold=50000;
+    if(!data.settings.financialYear) data.settings.financialYear=(new Date().getFullYear())+'-'+String(new Date().getFullYear()+1).slice(-2);
+  };
+  ensure(); save();
+
+  const n=v=>Number(v||0), safe=v=>esc(v==null?'':v), loanBy=id=>data.loans.find(l=>l.id===id), customerBy=id=>getCustomer(id);
+  const monthKey=d=>String(d||today).slice(0,7);
+  const daysLate=d=>d?Math.max(0,Math.floor((Date.parse(today)-Date.parse(d))/86400000)):0;
+
+  /* 1. Smart notification engine */
+  const oldGetNotifications=window.getNotifications;
+  window.getNotifications=function(){
+    let base=typeof oldGetNotifications==='function'?oldGetNotifications():[];
+    const extra=[];
+    data.loans.filter(l=>n(l.balance)>0&&l.due===today).slice(0,10).forEach(l=>{const c=customerBy(l.customerId);extra.push({page:'dues',title:'Due today',text:(c?.name||'Customer')+' · '+money(l.installment||l.balance)})});
+    data.loans.filter(l=>n(l.balance)>0&&l.due&&l.due<today).slice(0,10).forEach(l=>{const c=customerBy(l.customerId);extra.push({page:'dues',title:'Overdue follow-up',text:(c?.name||'Customer')+' · '+daysLate(l.due)+' days overdue'})});
+    data.approvals.filter(a=>a.status==='Pending').slice(0,10).forEach(a=>extra.push({page:'settings',title:'Approval pending',text:a.type+' · '+money(a.amount||0)}));
+    data.pdc.filter(x=>x.status==='Pending'&&x.dueDate&&x.dueDate<=today).slice(0,10).forEach(x=>extra.push({page:'settings',title:'PDC attention',text:'Cheque '+x.chequeNo+' · '+x.dueDate}));
+    return extra.concat(base).slice(0,30);
+  };
+
+  /* 2. Route planning */
+  window.routePlanner=function(){
+    const rows={};
+    data.loans.filter(l=>n(l.balance)>0&&((l.due===today)||(l.due&&l.due<today))).forEach(l=>{const c=customerBy(l.customerId);const area=(c?.area||'Unassigned').trim()||'Unassigned';(rows[area]??=[]).push(l)});
+    const html=Object.keys(rows).sort().map(area=>`<div class="section" style="margin-top:12px"><div class="section-head"><h3>${safe(area)}</h3><span class="muted">${rows[area].length} stops</span></div>${rows[area].sort((a,b)=>(customerBy(a.customerId)?.name||'').localeCompare(customerBy(b.customerId)?.name||'')).map(l=>{const c=customerBy(l.customerId);return `<div class="txn"><div class="txn-left"><div class="txn-icon">→</div><div><b>${safe(c?.name||'Customer')}</b><small>${safe(c?.mobile||'')} · ${safe(l.id)}</small></div></div><span class="positive">${money(Math.min(n(l.balance),n(l.installment||l.balance)))}</span></div>`}).join('')}</div>`).join('')||'<div class="empty">No collection stops for today</div>';
+    openModal('Collection Route Planner',`<div class="settings-note">Grouped by customer area. Use this as today\'s collection route.</div>${html}`);
+  };
+
+  /* 3. Promise-to-pay */
+  window.promiseManager=function(){
+    const items=data.followUps.filter(f=>f.status==='Promised').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    openModal('Promise-to-Pay Tracker',`<div class="section-head"><h3>Promises</h3><span class="muted">${items.length} active promises</span></div><div class="table-scroll"><table class="table"><thead><tr><th>CUSTOMER</th><th>LOAN</th><th>PROMISE DATE</th><th>AMOUNT</th><th>STATUS</th><th></th></tr></thead><tbody>${items.map(f=>{const c=customerBy(f.customerId),l=loanBy(f.loanId);return `<tr><td>${safe(c?.name||'-')}</td><td>${safe(f.loanId||'-')}</td><td>${safe(f.date||'-')}</td><td>${money(n(f.promiseAmount))}</td><td><span class="status ${f.date<today?'overdue':'due'}">${f.date<today?'Missed':'Promised'}</span></td><td><button class="mini-btn" onclick="openFollowUp('${f.customerId}','${f.loanId||''}')">Update</button></td></tr>`}).join('')||'<tr><td colspan="6"><div class="empty">No promises recorded</div></td></tr>'}</tbody></table></div>`);
+  };
+  const oldOpenFollowUp=window.openFollowUp;
+  window.openFollowUp=function(customerId,loanId){
+    const c=customerBy(customerId); if(!c)return;
+    const existing=data.followUps.filter(x=>x.customerId===customerId).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];
+    if(typeof guard==='function'&&!guard(['Admin','Manager','Collector']))return;
+    openModal('Customer Follow-up',`<form onsubmit="saveFollowUpPlus(event,'${customerId}','${loanId||''}')"><div class="form-grid"><div class="field"><label>Status</label><select name="status"><option>Pending</option><option>Contacted</option><option selected>Promised</option><option>Done</option></select></div><div class="field"><label>Priority</label><select name="priority"><option>High</option><option selected>Medium</option><option>Low</option></select></div><div class="field"><label>Next Follow-up</label><input type="date" name="date" value="${existing?.date||today}"></div><div class="field"><label>Promise Amount</label><input name="promiseAmount" type="number" min="0" value="${existing?.promiseAmount||''}"></div><div class="field"><label>Loan</label><select name="loanId"><option value="">Customer</option>${data.loans.filter(l=>l.customerId===customerId).map(l=>`<option value="${l.id}" ${l.id===loanId?'selected':''}>${l.id} · ${money(l.balance)}</option>`).join('')}</select></div><div class="field"><label>Contact Type</label><select name="contactType"><option>Call</option><option>Visit</option><option>WhatsApp</option><option>SMS</option><option>Other</option></select></div><div class="field" style="grid-column:1/-1"><label>Notes</label><textarea name="notes" rows="4">${safe(existing?.notes||'')}</textarea></div></div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Save Follow-up</button></div></form>`);
+  };
+  window.saveFollowUpPlus=function(e,customerId,loanId){
+    e.preventDefault();const f=new FormData(e.target);const item={id:'FU-'+Date.now(),customerId,loanId:f.get('loanId')||loanId||'',status:f.get('status'),priority:f.get('priority'),date:f.get('date')||today,notes:f.get('notes')||'',promiseAmount:n(f.get('promiseAmount')),contactType:f.get('contactType')||'Call',createdAt:profNow()};
+    data.followUps.unshift(item);data.communications.unshift({id:'COM-'+Date.now(),customerId,loanId:item.loanId,type:item.contactType,note:item.notes,date:today,createdAt:profNow()});save();audit('Follow-up saved','Customer',customerId,item.status+' · '+item.contactType);closeModal();toast('Follow-up saved');render('dues');
+  };
+
+  /* 4. Renewal / 5. Top-up / 6. Settlement */
+  window.loanActionsPro=function(id){
+    const l=loanBy(id);if(!l)return;const c=customerBy(l.customerId);
+    openModal('Loan Actions · '+id,`<div class="quick-menu"><button onclick="loanDetail('${id}')">View Loan</button><button onclick="loanSchedule('${id}')">Repayment Schedule</button>${l.balance>0?`<button onclick="openPayment('${id}')">Collect Payment</button>`:''}<button onclick="openLoanRenewal('${id}')">Renew Loan</button><button onclick="openLoanTopup('${id}')">Top-up Loan</button>${l.balance>0?`<button onclick="openSettlement('${id}')">Early Settlement</button>`:''}<button onclick="loanStatement('${id}')">Print Statement</button><button onclick="loanWhatsapp('${id}')">WhatsApp Reminder</button><button onclick="editLoan('${id}')">Edit Loan</button></div>`);
+  };
+  window.openLoanRenewal=function(id){const l=loanBy(id);if(!l)return;const c=customerBy(l.customerId);openModal('Loan Renewal',`<div class="payment-summary"><div><span>Customer</span><b>${safe(c?.name)}</b></div><div><span>Previous Loan</span><b>${safe(id)}</b></div><div><span>Outstanding</span><b>${money(l.balance)}</b></div></div><form onsubmit="saveLoanRenewal(event,'${id}')"><div class="form-grid"><div class="field"><label>New Amount *</label><input name="amount" type="number" min="1" value="${Math.max(1000,n(l.amount))}" required></div><div class="field"><label>Interest %</label><input name="rate" type="number" min="0" step="0.01" value="${n(l.rate)}"></div><div class="field"><label>Tenure</label><input name="tenure" type="number" min="1" value="${n(l.tenure)||1}"></div><div class="field"><label>Frequency</label><select name="frequency"><option>Daily</option><option>Weekly</option><option selected>Monthly</option></select></div></div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Create Renewal</button></div></form>`)};
+  window.saveLoanRenewal=function(e,id){e.preventDefault();const l=loanBy(id),f=new FormData(e.target),amount=n(f.get('amount')),rate=n(f.get('rate')),tenure=Math.max(1,n(f.get('tenure'))),interest=amount*rate/100,total=amount+interest,installment=total/tenure;if(!l||!amount)return toast('Enter valid renewal amount');const nid='LN-'+String(data.loans.length+123).padStart(5,'0');data.loans.push({id:nid,customerId:l.customerId,amount,interest,total,balance:total,paid:0,rate,interestType:'Flat',type:l.type||'Renewal',tenure,start:today,due:today,frequency:f.get('frequency'),installment,status:'Active',payments:[],createdAt:profNow(),renewedFrom:id,branchId:l.branchId||data.branches[0]?.id});const c=customerBy(l.customerId);c.borrowed=(c.borrowed||0)+amount;c.balance=(c.balance||0)+total;save();audit('Loan renewed','Loan',nid,'From '+id+' · '+money(amount));closeModal();toast('Renewal loan created');render('loans')};
+  window.openLoanTopup=function(id){const l=loanBy(id);if(!l)return;openModal('Loan Top-up',`<div class="payment-summary"><div><span>Loan</span><b>${id}</b></div><div><span>Current Outstanding</span><b>${money(l.balance)}</b></div></div><form onsubmit="saveLoanTopup(event,'${id}')"><div class="form-grid"><div class="field"><label>Top-up Amount *</label><input name="topup" type="number" min="1" required></div><div class="field"><label>Interest %</label><input name="rate" type="number" min="0" step="0.01" value="${n(l.rate)}"></div><div class="field"><label>Additional Tenure</label><input name="tenure" type="number" min="1" value="${n(l.tenure)||1}"></div></div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Apply Top-up</button></div></form>`)};
+  window.saveLoanTopup=function(e,id){e.preventDefault();const l=loanBy(id),f=new FormData(e.target),top=n(f.get('topup')),rate=n(f.get('rate')),tenure=Math.max(1,n(f.get('tenure')));if(!l||top<=0)return toast('Enter valid top-up amount');const interest=top*rate/100,total=top+interest;l.amount=n(l.amount)+top;l.interest=n(l.interest)+interest;l.balance=n(l.balance)+total;l.total=n(l.total)+total;l.rate=rate;l.tenure=n(l.tenure)+tenure;l.installment=(n(l.balance)/Math.max(1,l.tenure));const c=customerBy(l.customerId);if(c)c.balance=n(c.balance)+total;c.borrowed=n(c.borrowed)+top;save();audit('Loan top-up','Loan',id,`Top-up ${money(top)}`);closeModal();toast('Top-up applied');render('loans')};
+  window.openSettlement=function(id){const l=loanBy(id);if(!l)return;const discount=Math.min(n(l.balance),n(l.balance)*0.02);const suggested=Math.max(0,n(l.balance)-discount);openModal('Early Settlement',`<div class="payment-summary"><div><span>Outstanding</span><b>${money(l.balance)}</b></div><div><span>Suggested settlement</span><b>${money(suggested)}</b></div></div><form onsubmit="saveSettlement(event,'${id}')"><div class="form-grid"><div class="field"><label>Settlement Amount *</label><input name="amount" type="number" min="0" max="${n(l.balance)}" step="0.01" value="${suggested}" required></div><div class="field"><label>Reason</label><input name="reason" value="Early closure"></div></div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Settle & Close</button></div></form>`)};
+  window.saveSettlement=function(e,id){e.preventDefault();const l=loanBy(id),f=new FormData(e.target),amount=n(f.get('amount'));if(!l||amount<=0||amount>n(l.balance))return toast('Invalid settlement amount');const before=n(l.balance),c=customerBy(l.customerId),p={id:(data.settings.receiptPrefix||'RC')+'-'+String(data.payments.length+1).padStart(5,'0'),customerId:c.id,loanId:id,amount,date:today,mode:'Cash',notes:'Early settlement: '+(f.get('reason')||''),createdAt:profNow(),previousBalance:before,balanceAfter:0};data.payments.push(p);l.balance=0;l.status='Closed';l.due='';c.balance=Math.max(0,n(c.balance)-before);save();audit('Loan settled','Loan',id,`Settlement ${money(amount)} · Previous ${money(before)}`);closeModal();toast('Loan settled');receipt(p.id);render('loans')};
+
+  /* 7. Collector performance */
+  window.collectionPerformance=function(){
+    const target=n(data.targets?.[today.slice(0,7)]?.daily);const total=data.payments.filter(p=>p.date===today).reduce((s,p)=>s+n(p.amount),0);const byMode={};data.payments.filter(p=>p.date===today).forEach(p=>byMode[p.mode||'Cash']=(byMode[p.mode||'Cash']||0)+n(p.amount));
+    openModal('Collection Performance',`<div class="cards"><div class="card"><div class="label">Today Collected</div><div class="value">${money(total)}</div></div><div class="card"><div class="label">Daily Target</div><div class="value">${money(target)}</div></div><div class="card"><div class="label">Achievement</div><div class="value">${target?Math.round(total/target*100):0}%</div></div><div class="card"><div class="label">Follow-ups Done</div><div class="value">${data.followUps.filter(f=>f.status==='Done'&&f.date===today).length}</div></div></div><div class="section" style="margin-top:14px"><h3>Payment Mode</h3><div class="detail-list">${Object.entries(byMode).map(([k,v])=>`<span>${safe(k)} <b>${money(v)}</b></span>`).join('')||'<span>No payments today</span>'}</div></div>`);
+  };
+
+  /* 8. Communication history */
+  window.communicationHistory=function(customerId){const c=customerBy(customerId);const rows=data.communications.filter(x=>x.customerId===customerId).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));openModal('Communication History · '+safe(c?.name||''),`<div class="section-head"><h3>Timeline</h3><button class="btn green" onclick="logCommunication('${customerId}')">+ Log Contact</button></div>${rows.map(x=>`<div class="activity-item"><div><b>${safe(x.type)}</b><small>${safe(x.note||'')}</small></div><span>${safe(x.date||'')}</span></div>`).join('')||'<div class="empty">No communication history</div>'}`)};
+  window.logCommunication=function(customerId){const c=customerBy(customerId);openModal('Log Communication',`<form onsubmit="saveCommunication(event,'${customerId}')"><div class="form-grid"><div class="field"><label>Type</label><select name="type"><option>Call</option><option>Visit</option><option>WhatsApp</option><option>SMS</option><option>Email</option></select></div><div class="field"><label>Date</label><input name="date" type="date" value="${today}"></div><div class="field" style="grid-column:1/-1"><label>Note</label><textarea name="note" required></textarea></div></div><div class="form-actions"><button type="button" class="btn light" onclick="communicationHistory('${customerId}')">Cancel</button><button class="btn green">Save</button></div></form>`)};
+  window.saveCommunication=function(e,customerId){e.preventDefault();const f=new FormData(e.target);data.communications.unshift({id:'COM-'+Date.now(),customerId,type:f.get('type'),date:f.get('date')||today,note:f.get('note'),createdAt:profNow()});save();audit('Communication logged','Customer',customerId,f.get('type'));toast('Communication saved');communicationHistory(customerId)};
+
+  /* 9. Fraud / integrity scanner */
+  window.fraudScanner=function(){
+    const flags=[];const refs={};data.payments.forEach(p=>{if(p.ref){const k=String(p.ref).trim().toLowerCase();if(refs[k])flags.push(`Duplicate payment reference ${p.ref} on ${p.id} and ${refs[k]}`);else refs[k]=p.id}const l=loanBy(p.loanId);if(l&&n(p.amount)>n(p.previousBalance??l.balance)+n(p.amount))flags.push(`Payment exceeds balance: ${p.id}`);});
+    data.customers.forEach(c=>{const same=data.customers.filter(x=>x.mobile&&x.mobile===c.mobile);if(same.length>1)flags.push(`Duplicate mobile: ${c.mobile}`)});
+    data.loans.forEach(l=>{if(l.balance<0)flags.push(`Negative balance: ${l.id}`);if(!l.customerId||!customerBy(l.customerId))flags.push(`Loan has missing customer: ${l.id}`)});
+    data.systemFlags=flags.map((x,i)=>({id:'FLAG-'+i+1,text:x,createdAt:profNow()}));save();openModal('Data Integrity & Risk Scan',`<div class="section-head"><h3>${flags.length?'Issues Found':'All Checks Passed'}</h3><span class="muted">${flags.length} flags</span></div>${flags.map(x=>`<div class="alert-box"><div><b>⚠ ${safe(x)}</b><small>Review before financial closing</small></div></div>`).join('')||'<div class="empty">No duplicate or integrity issues detected.</div>'}`)};
+
+  /* 10. Financial calendar */
+  window.financialCalendar=function(){
+    const rows=[...data.loans.filter(l=>n(l.balance)>0&&l.due).map(l=>({date:l.due,type:l.due<today?'Overdue':'Due',text:(customerBy(l.customerId)?.name||'Customer')+' · '+money(l.installment||l.balance)})),...data.pdc.filter(x=>x.status==='Pending').map(x=>({date:x.dueDate,type:'PDC',text:'Cheque '+x.chequeNo+' · '+money(x.amount)})),...data.followUps.filter(f=>f.status!=='Done'&&f.date).map(f=>({date:f.date,type:'Follow-up',text:(customerBy(f.customerId)?.name||'Customer')}))].sort((a,b)=>a.date.localeCompare(b.date));
+    openModal('Financial Calendar',`<div class="table-scroll"><table class="table"><thead><tr><th>DATE</th><th>TYPE</th><th>DETAIL</th></tr></thead><tbody>${rows.slice(0,100).map(x=>`<tr><td>${safe(x.date)}</td><td><span class="status ${x.type.toLowerCase().replace(/\s/g,'')}">${safe(x.type)}</span></td><td>${safe(x.text)}</td></tr>`).join('')||'<tr><td colspan="3"><div class="empty">No scheduled items</div></td></tr>'}</tbody></table></div>`)};
+
+  /* 11. KPI center */
+  window.kpiCenter=function(){const loans=data.loans,pay=data.payments,exp=data.expenses||[],out=loans.reduce((s,l)=>s+n(l.balance),0),od=overdueLoans().reduce((s,l)=>s+n(l.balance),0),month=today.slice(0,7);const mc=pay.filter(p=>String(p.date).slice(0,7)===month).reduce((s,p)=>s+n(p.amount),0),me=exp.filter(x=>String(x.date).slice(0,7)===month).reduce((s,x)=>s+n(x.amount),0),eff=dueAmountToday()?Math.round(pay.filter(p=>p.date===today).reduce((s,p)=>s+n(p.amount),0)/dueAmountToday()*100):0;openModal('Business KPI',`<div class="cards"><div class="card"><div class="label">Outstanding</div><div class="value">${money(out)}</div></div><div class="card"><div class="label">Overdue Portfolio</div><div class="value">${money(od)}</div></div><div class="card"><div class="label">Collection Efficiency</div><div class="value">${eff}%</div></div><div class="card"><div class="label">Month Net</div><div class="value">${money(mc-me)}</div></div></div><div class="detail-list" style="margin-top:14px"><span>Interest in portfolio <b>${money(loans.reduce((s,l)=>s+n(l.interest),0))}</b></span><span>Active customers <b>${data.customers.filter(c=>n(c.balance)>0).length}</b></span><span>High-risk customers <b>${data.customers.filter(c=>riskScore(c)>=60).length}</b></span></div>`)};
+
+  /* 12. Import wizard */
+  window.importWizard=function(){openModal('Data Import Wizard',`<div class="settings-note">Import a JSON backup safely. The file is validated before replacing local data.</div><div class="form-actions"><button class="btn green" onclick="importBackupValidated()">Choose Backup File</button></div>`)};
+  window.importBackupValidated=function(){const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=()=>{const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result),d=p.data||p;if(!Array.isArray(d.customers)||!Array.isArray(d.loans)||!Array.isArray(d.payments))throw Error('Invalid');const issues=[];d.loans.forEach(l=>{if(!l.id||!l.customerId)issues.push('Loan missing ID/customer')});d.payments.forEach(x=>{if(!x.id||!x.loanId)issues.push('Payment missing receipt/loan')});if(issues.length)return toast(issues[0]);const old=data;data=d;ensure();data.importLog.unshift({at:profNow(),file:f.name,records:data.customers.length+data.loans.length+data.payments.length});save();audit('Validated backup imported','System','import',f.name);toast('Validated backup restored');appSettings()}catch(e){toast('Invalid backup file')}};r.readAsText(f)};input.click()};
+
+  /* 13. Loan product manager */
+  window.loanProductManager=function(){const rows=data.loanProducts.map(p=>`<tr><td><b>${safe(p.name)}</b></td><td>${n(p.rate)}%</td><td>${safe(p.frequency)}</td><td>${n(p.tenure)}</td></tr>`).join('');openModal('Loan Products',`<div class="section-head"><h3>Products</h3><button class="btn green" onclick="addLoanProduct()">+ Add Product</button></div><div class="table-scroll"><table class="table"><thead><tr><th>NAME</th><th>RATE</th><th>FREQUENCY</th><th>TENURE</th></tr></thead><tbody>${rows||'<tr><td colspan="4"><div class="empty">No custom products</div></td></tr>'}</tbody></table></div>`)};
+  window.addLoanProduct=function(){openModal('Add Loan Product',`<form onsubmit="saveLoanProduct(event)"><div class="form-grid"><div class="field"><label>Product Name</label><input name="name" required></div><div class="field"><label>Interest %</label><input name="rate" type="number" min="0" step="0.01"></div><div class="field"><label>Frequency</label><select name="frequency"><option>Daily</option><option>Weekly</option><option>Monthly</option></select></div><div class="field"><label>Default Tenure</label><input name="tenure" type="number" min="1" value="12"></div></div><div class="form-actions"><button type="button" class="btn light" onclick="loanProductManager()">Cancel</button><button class="btn green">Save Product</button></div></form>`)};
+  window.saveLoanProduct=function(e){e.preventDefault();const f=new FormData(e.target);data.loanProducts.push({id:'LP-'+Date.now(),name:f.get('name'),rate:n(f.get('rate')),frequency:f.get('frequency'),tenure:n(f.get('tenure'))});save();audit('Loan product added','System',data.loanProducts.at(-1).id,f.get('name'));toast('Loan product saved');loanProductManager()};
+
+  /* 14. Approval workflow */
+  window.approvalManager=function(){const rows=data.approvals.slice().reverse().map(a=>`<tr><td>${safe(a.type)}</td><td>${safe(a.reference)}</td><td>${money(a.amount)}</td><td><span class="status ${a.status.toLowerCase()}">${safe(a.status)}</span></td><td>${a.status==='Pending'?`<button class="mini-btn green-mini" onclick="approveItem('${a.id}')">Approve</button>`:''}</td></tr>`).join('');openModal('Approval Workflow',`<div class="settings-note">Large-value transactions can be reviewed before final processing.</div><div class="table-scroll"><table class="table"><thead><tr><th>TYPE</th><th>REFERENCE</th><th>AMOUNT</th><th>STATUS</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="5"><div class="empty">No approval requests</div></td></tr>'}</tbody></table></div>`)};
+  window.approveItem=function(id){if(typeof guard==='function'&&!guard(['Admin','Manager']))return;const a=data.approvals.find(x=>x.id===id);if(!a)return;a.status='Approved';a.approvedAt=profNow();save();audit('Approval granted','Approval',id,a.type+' · '+money(a.amount));toast('Approval granted');approvalManager()};
+
+  /* 15. End-of-month lock helper */
+  window.financialPeriodManager=function(){lockManager()};
+
+  /* 16. Multi-branch assignment */
+  window.branchAssignment=function(){const rows=data.loans.map(l=>{const c=customerBy(l.customerId);return `<tr><td>${safe(l.id)}</td><td>${safe(c?.name||'-')}</td><td><select onchange="assignLoanBranch('${l.id}',this.value)">${data.branches.map(b=>`<option value="${b.id}" ${b.id===(l.branchId||data.branches[0]?.id)?'selected':''}>${safe(b.name)}</option>`).join('')}</select></td></tr>`}).join('');openModal('Branch Assignment',`<div class="table-scroll"><table class="table"><thead><tr><th>LOAN</th><th>CUSTOMER</th><th>BRANCH</th></tr></thead><tbody>${rows||'<tr><td colspan="3"><div class="empty">No loans</div></td></tr>'}</tbody></table></div>`)};
+  window.assignLoanBranch=function(id,bid){const l=loanBy(id);if(!l)return;l.branchId=bid;save();audit('Loan branch changed','Loan',id,bid);toast('Branch updated')};
+
+  /* 17. Daily route + KPI quick center, injected into existing Professional Controls only */
+  const oldPC=window.professionalCenter;
+  window.professionalCenter=function(){
+    oldPC();
+    setTimeout(()=>{
+      const root=document.querySelector('.pro-center'); if(!root)return;
+      const actions=root.querySelector('.data-actions'); if(!actions)return;
+      const defs=[['routePlanner','Collection Route'],['promiseManager','Promise-to-Pay'],['collectionPerformance','Collection Performance'],['communicationHistory','Customer Communications'],['fraudScanner','Integrity Scanner'],['financialCalendar','Financial Calendar'],['kpiCenter','Business KPI'],['importWizard','Import Wizard'],['loanProductManager','Loan Products'],['approvalManager','Approvals'],['branchAssignment','Branch Assignment']];
+      defs.forEach(([fn,label])=>{if(!actions.querySelector(`[data-plus="${fn}"]`)){const b=document.createElement('button');b.className='btn';b.dataset.plus=fn;b.textContent=label;b.onclick=()=>window[fn]();actions.appendChild(b)}});
+    },0);
+  };
+  window.professionalCenter=professionalCenter;
+
+  /* Make loan menu expose the advanced workflow while retaining existing options. */
+  window.loanMenu=function(id){loanActionsPro(id)};
+
+  /* Customer profile quick access: communication history remains additive. */
+  window.customerCommunication=function(id){communicationHistory(id)};
+
+  /* Protect edits in locked months for common date-bearing records. */
+  const oldSaveFollow=window.saveFollowUp;
+  window.saveFollowUp=function(e,customerId,loanId){
+    const f=e?.target?new FormData(e.target):null;const m=monthKey(f?.get('date'));if(data.monthLocks?.[m]){toast('This month is locked');return;}return oldSaveFollow?oldSaveFollow(e,customerId,loanId):saveFollowUpPlus(e,customerId,loanId);
+  };
+
+  /* Approval helper for large manual disbursement / top-up requests. */
+  window.requestApproval=function(type,reference,amount,details){const x={id:'APR-'+Date.now(),type,reference,amount:n(amount),details:details||'',status:'Pending',requestedAt:profNow()};data.approvals.push(x);save();audit('Approval requested','Approval',x.id,type+' · '+money(amount));toast('Approval request created');return x};
+
+  save();
+})();
