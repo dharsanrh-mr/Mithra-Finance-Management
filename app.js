@@ -744,9 +744,8 @@ function styledPrompt(title,message,value,onDone){openModal(title,`<div class="p
 function printCurrentModal(){const card=document.querySelector('#modal .modal-card');if(!card)return;const w=window.open('','_blank','width=900,height=700');if(!w)return;w.document.write('<html><head><title>Mithra Finance System Report</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#152036}.report-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.report-summary-grid div{border:1px solid #e5eaf1;border-radius:12px;padding:16px}.report-summary-grid span{display:block;color:#7b889b;font-size:12px}.report-summary-grid b{display:block;font-size:20px;margin-top:6px}</style></head><body>'+card.innerHTML+'</body></html>');w.document.close();w.focus();w.print()}
 function toast(t){let x=document.createElement("div");x.className="toast";x.innerHTML='<span class="toast-dot">✓</span><span>'+esc(t)+'</span>';document.body.appendChild(x);setTimeout(()=>x.remove(),2200)}
 function exportData(){let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="mithra-finance-system-v2-backup.json";a.click()}
-function resetData(){if(confirm("Reset demo data?")){localStorage.removeItem(KEY);location.reload()}}
 try{render("dashboard")}catch(err){console.error(err);document.getElementById("page").innerHTML=`<div class="card error-card"><h2>Mithra Finance System could not load</h2><p>Saved data was incompatible. Reset the demo data and reload.</p><button class="btn green" onclick="resetData()">Reset Demo Data</button><button class="btn light" onclick="location.reload()">Reload</button><pre>${String(err.message||err)}</pre></div>`}
-function resetData(){localStorage.removeItem(KEY);location.reload()}
+function resetData(){styledConfirm("Reset Demo Data","This will remove the current local demo records and reload Mithra Finance System.",()=>{localStorage.removeItem(KEY);location.reload()})}
 
 /* Mithra Finance System V7 - Customer 360 + Loan Detail enhancements */
 function customerDetail(id){
@@ -1896,13 +1895,13 @@ window.professionalCenter=professionalCenter;
       `).join('')||'<div class="empty">No saved views yet.</div>'}</div>`);
   };
   window.mithraSaveCurrentView=function(){
-    const name=prompt('Name this view');
-    if(!name)return;
+    styledPrompt('Save View','Enter a name for this saved view.','',name=>{if(!name)return;
     const query=[...document.querySelectorAll('input[type="search"],input[placeholder*="Search"]')].map(x=>x.value).find(Boolean)||'';
     const filters=[...document.querySelectorAll('select')].map(x=>x.value).filter(Boolean);
     data.mithraControl.savedViews.unshift({name,query,filters,at:profNow()});
     data.mithraControl.savedViews=data.mithraControl.savedViews.slice(0,20);save();
     toast('View saved');mithraSavedViews();
+    });
   };
   window.mithraApplyView=function(i){
     const v=data.mithraControl.savedViews[i];if(!v)return;
@@ -1950,9 +1949,10 @@ window.professionalCenter=professionalCenter;
         <section class="mc-task-col"><h4>${status}</h4>${t.filter(x=>x.status===status).map(x=>`<div class="mc-task"><b>${mpEsc(x.title)}</b><small>${mpEsc(x.priority||'Normal')} · ${mpEsc(x.due||'')}</small><div><button class="icon-btn" onclick="mithraCycleTask('${x.id}')">Move</button><button class="icon-btn" onclick="mithraDeleteTask('${x.id}')">×</button></div></div>`).join('')||'<div class="empty">Empty</div>'}</section>`).join('')}</div>`);
   };
   window.mithraAddTask=function(){
-    const title=prompt('Task title');if(!title)return;
+    styledPrompt('Add Task','Enter the task title.','',title=>{if(!title)return;
     data.mithraControl.tasks.push({id:'TSK-'+Date.now(),title,status:'To Do',priority:'Normal',due:today});
     save();toast('Task added');mithraTaskBoard();
+    });
   };
   window.mithraCycleTask=function(id){
     const x=data.mithraControl.tasks.find(t=>t.id===id);if(!x)return;
@@ -2232,9 +2232,7 @@ window.professionalCenter=professionalCenter;
       <div class="mio-goals">${data.mithraIntel.goals.map((g,i)=>{const pct=Math.min(100,Math.round((Number(g.current||0)/Math.max(1,Number(g.target||1)))*100));return `<div class="mio-goal"><div><b>${mpEsc(g.name)}</b><small>${muMoney(g.current||0)} / ${muMoney(g.target||0)}</small></div><div class="mio-progress"><span style="width:${pct}%"></span></div><button class="icon-btn" onclick="mithraDeleteGoal(${i})">×</button></div>`}).join('')||'<div class="empty">No targets configured.</div>'}</div>`);
   };
   window.mithraAddGoal=function(){
-    const name=prompt('Target name');if(!name)return;
-    const target=Number(prompt('Target amount')||0);if(!target)return;
-    data.mithraIntel.goals.push({name,target,current:0});save();mithraGoals();
+    styledPrompt('Add Target','Enter the target name.','',name=>{if(!name)return; styledPrompt('Target Amount','Enter the target amount.','0',raw=>{const target=Number(raw||0);if(!target)return; data.mithraIntel.goals.push({name,target,current:0});save();mithraGoals();});});
   };
   window.mithraDeleteGoal=function(i){data.mithraIntel.goals.splice(i,1);save();mithraGoals();};
 

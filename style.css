@@ -603,3 +603,107 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
 .mio-progress{height:7px;border-radius:10px;background:rgba(127,127,127,.12);overflow:hidden}
 .mio-progress span{display:block;height:100%;background:currentColor;border-radius:10px}
 @media(max-width:650px){.mio-scenario-grid,.mio-trust-grid{grid-template-columns:1fr}.mio-form{grid-template-columns:1fr}.mio-goal{grid-template-columns:1fr}.mio-tools{gap:2px}}
+
+
+/* ============================================================
+   MITHRA GLOBAL POPUP SYSTEM — UI-matched across every page
+   Applies to both the main modal and legacy dynamic backdrops.
+   No page layout/data changes.
+   ============================================================ */
+#modal.modal,
+.modal-backdrop{
+  background:rgba(16,24,39,.62)!important;
+  backdrop-filter:blur(5px)!important;
+  -webkit-backdrop-filter:blur(5px)!important;
+}
+#modal .modal-card,
+.modal-backdrop>.modal{
+  background:#fff!important;
+  color:#17263d;
+  border:1px solid #e4eaf1!important;
+  border-radius:18px!important;
+  box-shadow:0 24px 70px rgba(21,32,54,.24)!important;
+}
+#modal .modal-head,
+.modal-backdrop>.modal .modal-head{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  background:linear-gradient(180deg,#fff 0%,#fbfcfd 100%)!important;
+  border-bottom:1px solid #edf1f5!important;
+}
+#modal .modal-head h3,
+.modal-backdrop>.modal .modal-head h2,
+.modal-backdrop>.modal .modal-head h3{
+  margin:0;color:#172a44;font-weight:800;letter-spacing:-.2px;
+}
+#modal .modal-head button,
+.modal-backdrop>.modal .modal-head .close{
+  border:1px solid #e1e7ee!important;background:#f4f7f9!important;color:#627187!important;
+  width:36px;height:36px;border-radius:10px!important;display:grid;place-items:center;
+  cursor:pointer;transition:.15s ease;
+}
+#modal .modal-head button:hover,
+.modal-backdrop>.modal .modal-head .close:hover{background:#e9f7f1!important;color:#118c5a!important;border-color:#ccefe0!important}
+#modal #modalBody,.modal-backdrop>.modal{font-size:12px}
+#modal #modalBody>form,
+#modal #modalBody>.section,
+#modal #modalBody>.profile-head,
+#modal #modalBody>.v7-profile,
+#modal #modalBody>.statement{animation:mithraPopupIn .16s ease-out}
+@keyframes mithraPopupIn{from{opacity:.6;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+/* Every action inside popups uses the same Mithra control language. */
+#modal .btn,.modal-backdrop>.modal .btn,
+#modal .quick-menu button,.modal-backdrop>.modal .quick-menu button,
+#modal .picker-row,.modal-backdrop>.modal .picker-row,
+#modal .quick-amounts button,.modal-backdrop>.modal .quick-amounts button{
+  font-family:inherit;transition:background .15s,border-color .15s,transform .15s,box-shadow .15s;
+}
+#modal .quick-menu button,.modal-backdrop>.modal .quick-menu button{
+  min-height:46px;padding:12px 13px;border:1px solid #e1e7ee!important;
+  background:#fbfcfd!important;border-radius:11px!important;color:#1c304b;font-weight:650;
+}
+#modal .quick-menu button:hover,.modal-backdrop>.modal .quick-menu button:hover{
+  background:#f0faf6!important;border-color:#bfe9d7!important;color:#118b59;transform:translateY(-1px);
+}
+#modal .picker-row,.modal-backdrop>.modal .picker-row{
+  min-height:54px;border-color:#e1e7ee!important;background:#fbfcfd!important;border-radius:11px!important;
+}
+#modal .picker-row:hover,.modal-backdrop>.modal .picker-row:hover{background:#f0faf6!important;border-color:#bfe9d7!important}
+#modal .profile-actions,.modal-backdrop>.modal .profile-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+#modal .profile-actions .btn,.modal-backdrop>.modal .profile-actions .btn{min-height:38px}
+#modal .section,.modal-backdrop>.modal .section{background:#fff;border:1px solid #e6ebf0;border-radius:12px;padding:14px}
+#modal .kpi,.modal-backdrop>.modal .kpi{background:#f7f9fb;border:1px solid #e7edf2;border-radius:11px;padding:12px}
+#modal .table,.modal-backdrop>.modal .table{border:1px solid #e5eaf0;border-radius:10px;overflow:hidden}
+#modal .table th,.modal-backdrop>.modal .table th{background:#f6f8fa;color:#68788d;font-size:10px;font-weight:800}
+#modal .table td,.modal-backdrop>.modal .table td{font-size:11px;color:#30445f}
+#modal .form-actions,.modal-backdrop>.modal .form-actions,.modal-backdrop>.modal .modal-actions{
+  display:flex;align-items:center;justify-content:flex-end;gap:8px;
+}
+#modal .btn.light,.modal-backdrop>.modal .btn.light{background:#f3f6f8!important;color:#4e6076!important;border:1px solid #dfe6ed!important}
+#modal .btn.light:hover,.modal-backdrop>.modal .btn.light:hover{background:#eaf0f4!important}
+#modal .btn.green,.modal-backdrop>.modal .btn.green{background:#16b477!important;color:#fff!important;border-color:#16b477!important}
+#modal .btn.green:hover,.modal-backdrop>.modal .btn.green:hover{background:#109d67!important;box-shadow:0 5px 15px rgba(22,180,119,.18)}
+#modal .btn.red,.modal-backdrop>.modal .btn.red{background:#d95361!important;color:#fff!important;border-color:#d95361!important}
+#modal input,#modal select,#modal textarea,
+.modal-backdrop>.modal input,.modal-backdrop>.modal select,.modal-backdrop>.modal textarea{
+  font-family:inherit;box-sizing:border-box;border:1px solid #dfe6ee!important;background:#fbfcfd!important;
+  border-radius:10px!important;color:#1c304b;outline:none;
+}
+#modal input:focus,#modal select:focus,#modal textarea:focus,
+.modal-backdrop>.modal input:focus,.modal-backdrop>.modal select:focus,.modal-backdrop>.modal textarea:focus{
+  border-color:#20b879!important;background:#fff!important;box-shadow:0 0 0 3px rgba(32,184,121,.10)!important;
+}
+#modal .empty,.modal-backdrop>.modal .empty{padding:22px 12px;text-align:center;color:#8190a2;border:1px dashed #dfe6ed;border-radius:11px;background:#fafcfd}
+#modal .confirm-dialog,.modal-backdrop>.modal .confirm-dialog,
+#modal .prompt-dialog,.modal-backdrop>.modal .prompt-dialog{padding:4px 0 0}
+#modal .confirm-icon{box-shadow:0 5px 18px rgba(170,106,0,.08)}
+#modal .modal-card::-webkit-scrollbar,.modal-backdrop>.modal::-webkit-scrollbar{width:7px}
+#modal .modal-card::-webkit-scrollbar-thumb,.modal-backdrop>.modal::-webkit-scrollbar-thumb{background:#d6dee7;border-radius:10px}
+@media(max-width:520px){
+  #modal.modal,.modal-backdrop{padding:10px!important}
+  #modal .modal-card,.modal-backdrop>.modal{width:100%!important;max-width:none!important;max-height:calc(100dvh - 20px)!important;border-radius:15px!important}
+  #modal #modalBody{padding:15px!important}
+  #modal .modal-head,.modal-backdrop>.modal .modal-head{padding:13px 15px!important}
+  #modal .form-actions,.modal-backdrop>.modal .form-actions,.modal-backdrop>.modal .modal-actions{gap:7px}
+  #modal .form-actions .btn,.modal-backdrop>.modal .form-actions .btn,.modal-backdrop>.modal .modal-actions .btn{flex:1 1 110px}
+}
