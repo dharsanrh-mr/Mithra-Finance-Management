@@ -1369,318 +1369,123 @@ window.professionalCenter=professionalCenter;
 
   save();
 
-  /* =========================================================
-     MITHRA FINANCE SYSTEM — NEXT LEVEL CONTROL LAYER
-     Additive only: reuses existing UI/modal styles and data.
-     No existing function/page is replaced.
-     ========================================================= */
-
-  data.mfsSecurity = data.mfsSecurity || {
-    autoLockMinutes: 30,
-    requireApprovalAbove: 50000,
-    sessionStarted: profNow(),
-    lastActivity: profNow()
+  /* ============================================================
+     MITHRA ULTIMATE — ACTION CENTER / INTELLIGENCE LAYER
+     Additive-only. Reuses existing data and UI helpers.
+     No duplicate pages, no duplicate IDs, no existing function replacement.
+     ============================================================ */
+  data.mithraUltimate = data.mithraUltimate || {
+    version: 1,
+    watched: [],
+    actionSeen: {},
+    forecastDays: 30
   };
-  data.mfsNumbering = data.mfsNumbering || {
-    customer: 'CUS', loan: 'LN', receipt: 'RCT', transaction: 'TXN',
-    followup: 'FUP', agreement: 'AGR'
-  };
-  data.mfsCommunications = Array.isArray(data.mfsCommunications) ? data.mfsCommunications : [];
-  data.mfsDocuments = Array.isArray(data.mfsDocuments) ? data.mfsDocuments : [];
-  data.mfsLifecycle = data.mfsLifecycle || {};
-  data.mfsPromises = Array.isArray(data.mfsPromises) ? data.mfsPromises : [];
-  data.mfsRoute = data.mfsRoute || {};
-  data.mfsImportLog = Array.isArray(data.mfsImportLog) ? data.mfsImportLog : [];
+  data.mithraUltimate.watched = Array.isArray(data.mithraUltimate.watched) ? data.mithraUltimate.watched : [];
+  data.mithraUltimate.actionSeen = data.mithraUltimate.actionSeen || {};
   save();
 
-  const mfsMoney = v => money(Number(v || 0));
-  const mfsMonth = d => String(d || today).slice(0,7);
-  const mfsDays = d => d ? Math.max(0, Math.floor((Date.parse(today)-Date.parse(d))/86400000)) : 0;
-  const mfsCustomer = id => data.customers.find(c => c.id === id);
-  const mfsLoan = id => data.loans.find(l => l.id === id);
-  const mfsMonthPayments = month => data.payments.filter(p => mfsMonth(p.date) === month);
-  const mfsMonthExpenses = month => (data.expenses || []).filter(x => mfsMonth(x.date) === month);
+  const muMoney = v => money(Number(v||0));
+  const muLoan = id => data.loans.find(l=>l.id===id);
+  const muCust = id => data.customers.find(c=>c.id===id);
+  const muOverdueDays = d => d ? Math.max(0,Math.floor((Date.parse(today)-Date.parse(d))/86400000)) : 0;
+  const muPaymentsFor = id => data.payments.filter(p=>p.loanId===id);
+  const muCollection = (from,to) => data.payments.filter(p=>String(p.date)>=from&&String(p.date)<=to).reduce((s,p)=>s+Number(p.amount||0),0);
+  const muDaysAgo = n => { const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+  const muDaysAhead = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 
-  function mfsNextId(kind) {
-    const p = data.mfsNumbering[kind] || kind.toUpperCase();
-    const list = kind==='customer' ? data.customers :
-                 kind==='loan' ? data.loans :
-                 kind==='receipt' ? data.payments :
-                 kind==='transaction' ? [...data.payments, ...(data.expenses||[])] : [];
-    let max = 0;
-    list.forEach(x => {
-      const s = String(x.id || '');
-      const m = s.match(new RegExp('^' + p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '-(\\d+)$'));
-      if (m) max = Math.max(max, Number(m[1]));
-    });
-    return p + '-' + String(max + 1).padStart(6,'0');
+  function muActions(){
+    const a=[];
+    const overdue=data.loans.filter(l=>Number(l.balance)>0&&l.due&&l.due<today);
+    const critical=overdue.filter(l=>muOverdueDays(l.due)>=30);
+    const dueToday=data.loans.filter(l=>Number(l.balance)>0&&l.due===today);
+    const follow=(data.followups||[]).filter(f=>f.status!=='Done'&&f.date&&f.date<=today);
+    const promises=(data.mithraPromises||[]).filter(x=>x.status==='Pending'&&x.date&&x.date<=today);
+    const audit=(data.auditLog||[]).length;
+    const orphan=data.payments.filter(p=>!muLoan(p.loanId));
+    const badBal=data.loans.filter(l=>Number(l.balance)<-0.01);
+    critical.slice(0,10).forEach(l=>a.push({type:'Critical Overdue',level:'high',title:`${muCust(l.customerId)?.name||'Customer'} · ${l.id}`,detail:`${muOverdueDays(l.due)} days overdue · ${muMoney(l.balance)}`,loan:l.id}));
+    dueToday.slice(0,10).forEach(l=>a.push({type:'Due Today',level:'medium',title:`${muCust(l.customerId)?.name||'Customer'} · ${l.id}`,detail:`Due ${muMoney(l.installment||l.balance)}`,loan:l.id}));
+    follow.slice(0,10).forEach(f=>a.push({type:'Follow-up',level:'medium',title:`Follow-up · ${muCust(f.customerId)?.name||'Customer'}`,detail:`Due ${f.date}`,customer:f.customerId}));
+    promises.slice(0,10).forEach(p=>a.push({type:'Promise Due',level:'medium',title:`Promise · ${muCust(p.customerId)?.name||'Customer'}`,detail:`${muMoney(p.amount)} promised`,loan:p.loanId}));
+    if(orphan.length)a.push({type:'Data Exception',level:'high',title:'Orphan payments',detail:`${orphan.length} payment(s) reference missing loans`});
+    if(badBal.length)a.push({type:'Data Exception',level:'high',title:'Invalid loan balances',detail:`${badBal.length} loan(s) have negative balance`});
+    if(!audit)a.push({type:'Control',level:'low',title:'Audit log empty',detail:'Review system activity controls'});
+    return a;
   }
 
-  function mfsKpiRows() {
-    const out = data.loans.reduce((s,l)=>s+Number(l.balance||0),0);
-    const overdue = overdueLoans().reduce((s,l)=>s+Number(l.balance||0),0);
-    const principal = data.loans.reduce((s,l)=>s+Number(l.amount||0),0);
-    const interest = data.loans.reduce((s,l)=>s+Number(l.interest||0),0);
-    const paid = data.payments.reduce((s,p)=>s+Number(p.amount||0),0);
-    const exp = (data.expenses||[]).reduce((s,x)=>s+Number(x.amount||0),0);
-    const recovery = principal ? Math.round((paid/principal)*100) : 0;
-    return {out,overdue,principal,interest,paid,exp,recovery};
-  }
-
-  window.mfsNextControlCenter = function(){
-    const k=mfsKpiRows();
-    const due=data.loans.filter(l=>Number(l.balance)>0 && l.due===today).length;
-    const critical=overdueLoans().filter(l=>mfsDays(l.due)>=31).length;
-    const pendingPromises=data.mfsPromises.filter(x=>x.status==='Pending').length;
-    openModal('Mithra Finance Control Center',`
-      <div class="pro-center">
-        <div class="cards">
-          <div class="card"><div class="label">Outstanding</div><div class="value">${mfsMoney(k.out)}</div></div>
-          <div class="card"><div class="label">Overdue</div><div class="value">${mfsMoney(k.overdue)}</div></div>
-          <div class="card"><div class="label">Recovery</div><div class="value">${k.recovery}%</div></div>
-          <div class="card"><div class="label">Critical 31+ Days</div><div class="value">${critical}</div></div>
-        </div>
-        <div class="data-actions">
-          <button class="btn" onclick="mfsAccountingCenter()">Accounting</button>
-          <button class="btn" onclick="mfsAnalyticsCenter()">Advanced Analytics</button>
-          <button class="btn" onclick="mfsSmartBICenter()">Smart Business Intelligence</button>
-          <button class="btn" onclick="mfsReminderCenter()">Reminder Center</button>
-          <button class="btn" onclick="mfsSecurityCenter()">Security & Roles</button>
-          <button class="btn" onclick="mfsLifecycleCenter()">Loan Lifecycle</button>
-          <button class="btn" onclick="mfsNumberingCenter()">Numbering</button>
-          <button class="btn" onclick="mfsImportExportCenter()">Import / Export</button>
-        </div>
-        <div class="settings-note">${due} due today · ${critical} critical overdue · ${pendingPromises} pending promises. Existing tools remain available separately.</div>
-      </div>`);
-  };
-
-  window.mfsAccountingCenter = function(){
-    const k=mfsKpiRows(), month=today.slice(0,7), mp=mfsMonthPayments(month), me=mfsMonthExpenses(month);
-    const cashIn=mp.filter(p=>String(p.mode||'Cash').toLowerCase()==='cash').reduce((s,p)=>s+Number(p.amount||0),0);
-    const digital=mp.reduce((s,p)=>s+Number(p.amount||0),0)-cashIn;
-    const expenses=me.reduce((s,x)=>s+Number(x.amount||0),0);
-    const net=digital+cashIn-expenses;
-    openModal('Accounting Center',`
+  window.mithraActionCenter=function(){
+    const a=muActions(), high=a.filter(x=>x.level==='high').length, med=a.filter(x=>x.level==='medium').length, low=a.filter(x=>x.level==='low').length;
+    openModal('Mithra Action Center',`
       <div class="cards">
-        <div class="card"><div class="label">Month Collections</div><div class="value">${mfsMoney(cashIn+digital)}</div></div>
-        <div class="card"><div class="label">Month Expenses</div><div class="value">${mfsMoney(expenses)}</div></div>
-        <div class="card"><div class="label">Net Movement</div><div class="value">${mfsMoney(net)}</div></div>
-        <div class="card"><div class="label">Portfolio Interest</div><div class="value">${mfsMoney(k.interest)}</div></div>
+        <div class="card"><div class="label">Immediate</div><div class="value">${high}</div></div>
+        <div class="card"><div class="label">Follow-up</div><div class="value">${med}</div></div>
+        <div class="card"><div class="label">Review</div><div class="value">${low}</div></div>
+        <div class="card"><div class="label">Total Actions</div><div class="value">${a.length}</div></div>
       </div>
-      <div class="detail-list" style="margin-top:14px">
-        <span>Cash collections <b>${mfsMoney(cashIn)}</b></span>
-        <span>Digital collections <b>${mfsMoney(digital)}</b></span>
-        <span>Principal issued <b>${mfsMoney(k.principal)}</b></span>
-        <span>Total payments received <b>${mfsMoney(k.paid)}</b></span>
-        <span>Outstanding portfolio <b>${mfsMoney(k.out)}</b></span>
-      </div>
-      <div class="form-actions">
-        <button class="btn" onclick="mfsAccountingExport()">Export Accounting CSV</button>
-        <button class="btn light" onclick="dailyClosing()">Daily Closing</button>
-      </div>`);
+      <div class="table-scroll" style="margin-top:14px"><table class="table"><thead><tr><th>LEVEL</th><th>ACTION</th><th>DETAIL</th><th></th></tr></thead><tbody>
+      ${a.map((x,i)=>`<tr><td>${x.level==='high'?'🔴':x.level==='medium'?'🟠':'🟡'} ${x.level}</td><td><b>${esc(x.type)}</b><br>${esc(x.title)}</td><td>${esc(x.detail)}</td><td>${x.loan?`<button class="mini-btn" onclick="mfsLifecycleDetail('${x.loan}')">Open</button>`:x.customer?`<button class="mini-btn" onclick="openCustomer('${x.customer}')">Open</button>`:''}</td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">No actions required 🎉</div></td></tr>'}
+      </tbody></table></div>
+      <div class="form-actions"><button class="btn" onclick="mithraBusinessSnapshot()">Business Snapshot</button><button class="btn" onclick="mithraCashForecast()">Cashflow Forecast</button><button class="btn" onclick="mithraDataHealth()">Data Health</button></div>`);
   };
 
-  window.mfsAccountingExport = function(){
-    const rows=[['Date','Type','Reference','Customer','Loan','Mode','Amount']];
-    data.payments.forEach(p=>rows.push([p.date,'Collection',p.id,mfsCustomer(mfsLoan(p.loanId)?.customerId)?.name||'',p.loanId,p.mode||'Cash',p.amount||0]));
-    (data.expenses||[]).forEach(x=>rows.push([x.date,'Expense',x.id||'',x.category||'', '',x.mode||'Cash',-(Number(x.amount||0))]));
-    downloadTextFile('mithra-accounting.csv',rows.map(r=>r.map(escapeCsv).join(',')).join('\n'),'text/csv');
-    toast('Accounting CSV exported');
-  };
-
-  window.mfsAnalyticsCenter = function(){
-    const months=[];
-    const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-5);
-    for(let i=0;i<6;i++){
-      const key=d.toISOString().slice(0,7);
-      const col=mfsMonthPayments(key).reduce((s,p)=>s+Number(p.amount||0),0);
-      const ex=mfsMonthExpenses(key).reduce((s,x)=>s+Number(x.amount||0),0);
-      const loans=data.loans.filter(l=>mfsMonth(l.createdAt||l.start)===key).reduce((s,l)=>s+Number(l.amount||0),0);
-      months.push({key,col,ex,loans,net:col-ex});
-      d.setMonth(d.getMonth()+1);
-    }
-    openModal('Advanced Analytics',`
-      <div class="table-scroll"><table class="table"><thead><tr><th>MONTH</th><th>COLLECTION</th><th>EXPENSE</th><th>NEW DISBURSED</th><th>NET</th></tr></thead>
-      <tbody>${months.map(x=>`<tr><td>${x.key}</td><td>${mfsMoney(x.col)}</td><td>${mfsMoney(x.ex)}</td><td>${mfsMoney(x.loans)}</td><td>${mfsMoney(x.net)}</td></tr>`).join('')}</tbody></table></div>
-      <div class="detail-list" style="margin-top:14px">
-        <span>Current outstanding <b>${mfsMoney(mfsKpiRows().out)}</b></span>
-        <span>Overdue portfolio <b>${mfsMoney(mfsKpiRows().overdue)}</b></span>
-        <span>Recovery rate <b>${mfsKpiRows().recovery}%</b></span>
-      </div>`);
-  };
-
-  window.mfsSmartBICenter = function(){
-    const rows=data.customers.map(c=>{
-      const ls=data.loans.filter(l=>l.customerId===c.id);
-      const od=ls.filter(l=>Number(l.balance)>0 && l.due && l.due<today).reduce((s,l)=>s+Number(l.balance||0),0);
-      const late=ls.filter(l=>l.due&&l.due<today).reduce((s,l)=>s+mfsDays(l.due),0);
-      const score=Math.min(100, Math.round((od>0?45:0)+(late>30?25:late>7?12:0)+(ls.length>1?10:0)+(Number(c.balance||0)>50000?15:0)));
-      return {c,od,score};
-    }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,20);
-    openModal('Smart Business Intelligence',`
-      <div class="settings-note">Priority is based on existing repayment and overdue data. It is a decision-support signal, not an automatic credit decision.</div>
-      <div class="table-scroll"><table class="table"><thead><tr><th>PRIORITY</th><th>CUSTOMER</th><th>OUTSTANDING</th><th>OVERDUE</th><th>RISK</th><th>ACTION</th></tr></thead>
-      <tbody>${rows.map(x=>`<tr><td>${x.score>=60?'High':x.score>=30?'Medium':'Low'}</td><td><b>${esc(x.c.name)}</b></td><td>${mfsMoney(x.c.balance)}</td><td>${mfsMoney(x.od)}</td><td>${x.score}/100</td><td><button class="mini-btn" onclick="openCustomer('${x.c.id}')">Open</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No priority alerts</div></td></tr>'}</tbody></table></div>`);
-  };
-
-  window.mfsReminderCenter = function(){
-    const due=data.loans.filter(l=>Number(l.balance)>0 && l.due===today);
-    const od=overdueLoans();
-    const promised=data.mfsPromises.filter(x=>x.status==='Pending' && x.date<=today);
-    const rows=[
-      ...due.map(l=>({kind:'Due Today',c:mfsCustomer(l.customerId),l})),
-      ...od.slice(0,30).map(l=>({kind:'Overdue',c:mfsCustomer(l.customerId),l})),
-      ...promised.map(x=>({kind:'Promise Due',c:mfsCustomer(x.customerId),l:mfsLoan(x.loanId)}))
-    ];
-    openModal('Reminder Center',`
-      <div class="section-head"><h3>${rows.length} reminders</h3><button class="btn" onclick="mfsReminderExport()">Export List</button></div>
-      <div class="table-scroll"><table class="table"><thead><tr><th>TYPE</th><th>CUSTOMER</th><th>AMOUNT</th><th>DATE</th><th>ACTION</th></tr></thead>
-      <tbody>${rows.map(x=>`<tr><td>${esc(x.kind)}</td><td>${esc(x.c?.name||'-')}</td><td>${mfsMoney(x.l?.installment||x.l?.balance||0)}</td><td>${esc(x.l?.due||today)}</td><td><button class="mini-btn" onclick="mfsCopyReminder('${x.c?.id||''}','${x.l?.id||''}')">Copy Message</button></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No reminders pending</div></td></tr>'}</tbody></table></div>`);
-  };
-
-  window.mfsCopyReminder = function(cid,lid){
-    const c=mfsCustomer(cid), l=mfsLoan(lid);
-    const msg=`Mithra Finance System: Dear ${c?.name||'Customer'}, your payment of ${mfsMoney(l?.installment||l?.balance||0)} is due on ${l?.due||today}. Please contact us for payment details.`;
-    if(navigator.clipboard?.writeText) navigator.clipboard.writeText(msg).then(()=>toast('Reminder copied')).catch(()=>toast(msg));
-    else toast(msg);
-  };
-
-  window.mfsReminderExport = function(){
-    const rows=[['Type','Customer','Mobile','Loan','Due','Amount']];
-    data.loans.filter(l=>Number(l.balance)>0 && (l.due===today || l.due<today)).forEach(l=>{
-      const c=mfsCustomer(l.customerId); rows.push([l.due<today?'Overdue':'Due Today',c?.name||'',c?.mobile||'',l.id,l.due,l.installment||l.balance]);
-    });
-    downloadTextFile('mithra-reminders.csv',rows.map(r=>r.map(escapeCsv).join(',')).join('\n'),'text/csv');
-    toast('Reminder list exported');
-  };
-
-  window.mfsSecurityCenter = function(){
-    const s=data.settings||{}, sec=data.mfsSecurity;
-    const users=data.users||[];
-    openModal('Security & Roles',`
+  window.mithraBusinessSnapshot=function(){
+    const from=muDaysAgo(30), k=data.loans.reduce((s,l)=>s+Number(l.balance||0),0);
+    const col=muCollection(from,today), overdue=data.loans.filter(l=>Number(l.balance)>0&&l.due&&l.due<today).reduce((s,l)=>s+Number(l.balance||0),0);
+    const due=data.loans.filter(l=>Number(l.balance)>0&&l.due>=today&&l.due<=muDaysAhead(30)).reduce((s,l)=>s+Number(l.installment||l.balance||0),0);
+    const exp=(data.expenses||[]).filter(x=>String(x.date)>=from&&String(x.date)<=today).reduce((s,x)=>s+Number(x.amount||0),0);
+    const target=Number(data.settings?.monthlyTarget||0);
+    const ach=target?Math.round(col/target*100):0;
+    openModal('Business Snapshot',`
       <div class="cards">
-        <div class="card"><div class="label">Current Role</div><div class="value">${esc(s.role||'Admin')}</div></div>
-        <div class="card"><div class="label">Users</div><div class="value">${users.length}</div></div>
-        <div class="card"><div class="label">Audit Entries</div><div class="value">${(data.auditLog||[]).length}</div></div>
-        <div class="card"><div class="label">Auto Lock</div><div class="value">${sec.autoLockMinutes}m</div></div>
+        <div class="card"><div class="label">30-Day Collection</div><div class="value">${muMoney(col)}</div></div>
+        <div class="card"><div class="label">Outstanding</div><div class="value">${muMoney(k)}</div></div>
+        <div class="card"><div class="label">Overdue</div><div class="value">${muMoney(overdue)}</div></div>
+        <div class="card"><div class="label">Next 30-Day Due</div><div class="value">${muMoney(due)}</div></div>
       </div>
-      <form onsubmit="mfsSaveSecurity(event)" style="margin-top:14px">
-        <div class="form-grid">
-          <label>Current Role<select name="role">${['Admin','Manager','Collector','Viewer'].map(r=>`<option ${s.role===r?'selected':''}>${r}</option>`).join('')}</select></label>
-          <label>Auto Lock Minutes<input name="autoLock" type="number" min="5" max="240" value="${sec.autoLockMinutes}"></label>
-          <label>Approval Above ₹<input name="approval" type="number" min="0" value="${sec.requireApprovalAbove}"></label>
-        </div>
-        <div class="form-actions"><button class="btn green">Save Security</button><button type="button" class="btn" onclick="mfsSecurityAudit()">Security Audit</button></div>
-      </form>`);
+      <div class="detail-list" style="margin-top:14px"><span>30-day expenses <b>${muMoney(exp)}</b></span><span>Net movement <b>${muMoney(col-exp)}</b></span><span>Monthly target achievement <b>${target?ach+'%':'Not configured'}</b></span><span>Actions required <b>${muActions().length}</b></span></div>`);
   };
 
-  window.mfsSaveSecurity = function(e){
-    e.preventDefault();
-    if(!guard(['Admin'])) return;
-    const f=new FormData(e.target);
-    data.settings.role=String(f.get('role')||'Admin');
-    data.mfsSecurity.autoLockMinutes=Math.max(5,Number(f.get('autoLock'))||30);
-    data.mfsSecurity.requireApprovalAbove=Math.max(0,Number(f.get('approval'))||0);
-    data.mfsSecurity.lastActivity=profNow();
-    save(); audit('Security settings updated','System','security',data.settings.role);
-    toast('Security settings saved'); mfsSecurityCenter();
+  window.mithraCashForecast=function(){
+    const days=Math.max(7,Math.min(90,Number(data.mithraUltimate.forecastDays)||30)), end=muDaysAhead(days);
+    const expected=data.loans.filter(l=>Number(l.balance)>0&&l.due>=today&&l.due<=end).reduce((s,l)=>s+Number(l.installment||l.balance||0),0);
+    const historical=muCollection(muDaysAgo(30),today);
+    const daily=historical/30;
+    const projected=Math.round(daily*days);
+    const expenses=(data.expenses||[]).filter(x=>String(x.date)>=today&&String(x.date)<=end).reduce((s,x)=>s+Number(x.amount||0),0);
+    openModal('Cashflow Forecast',`
+      <div class="cards"><div class="card"><div class="label">Scheduled Due</div><div class="value">${muMoney(expected)}</div></div><div class="card"><div class="label">Historical Pace</div><div class="value">${muMoney(projected)}</div></div><div class="card"><div class="label">Planned Expenses</div><div class="value">${muMoney(expenses)}</div></div><div class="card"><div class="label">Projected Net</div><div class="value">${muMoney(projected-expenses)}</div></div></div>
+      <div class="settings-note" style="margin-top:12px">Forecast is based only on existing local payment history and scheduled dues; it does not modify actual transactions.</div>`);
   };
 
-  window.mfsSecurityAudit = function(){
+  window.mithraDataHealth=function(){
     const issues=[];
-    if(!data.settings.role) issues.push('No active role configured');
-    if(!(data.auditLog||[]).length) issues.push('Audit log is empty');
-    if(!data.settings.openingCash && data.settings.openingCash!==0) issues.push('Opening cash not configured');
-    openModal('Security Audit',`<div class="${issues.length?'alert-box':'settings-note'}">${issues.length?issues.map(x=>`<b>⚠ ${esc(x)}</b><br>`).join(''):'✓ Security baseline checks passed.'}</div>`);
+    const custIds=new Set(data.customers.map(c=>c.id));
+    const loanIds=new Set(data.loans.map(l=>l.id));
+    data.loans.forEach(l=>{
+      if(!custIds.has(l.customerId))issues.push('Loan '+l.id+' has no customer');
+      if(l.due&&l.start&&String(l.due)<String(l.start))issues.push('Loan '+l.id+' has due date before start');
+      if(Number(l.balance)<0)issues.push('Loan '+l.id+' has negative balance');
+    });
+    data.payments.forEach(p=>{if(!loanIds.has(p.loanId))issues.push('Payment '+p.id+' has no loan')});
+    const mobiles={}; data.customers.forEach(c=>{const m=String(c.mobile||'').replace(/\D/g,'');if(m){if(mobiles[m])issues.push(`Possible duplicate mobile: ${m}`);else mobiles[m]=c.id}});
+    const missing=data.customers.filter(c=>!c.name||!c.mobile).length;
+    if(missing)issues.push(`${missing} customer(s) missing name or mobile`);
+    const score=Math.max(0,Math.round(100-(issues.length/Math.max(1,data.customers.length+data.loans.length+data.payments.length))*100));
+    openModal('Data Health',`
+      <div class="cards"><div class="card"><div class="label">Health Score</div><div class="value">${score}%</div></div><div class="card"><div class="label">Issues</div><div class="value">${issues.length}</div></div><div class="card"><div class="label">Customers</div><div class="value">${data.customers.length}</div></div><div class="card"><div class="label">Loans</div><div class="value">${data.loans.length}</div></div></div>
+      <div class="detail-list" style="margin-top:14px">${issues.slice(0,30).map(x=>`<span>⚠ <b>${esc(x)}</b></span>`).join('')||'<span>✓ No data-quality issues detected.</span>'}</div>`);
   };
 
-  window.mfsLifecycleCenter = function(){
-    const rows=data.loans.map(l=>{
-      const hasPay=data.payments.some(p=>p.loanId===l.id);
-      const state=l.balance<=0?'Closed':(l.status==='Overdue'?'Overdue':hasPay?'Repayment':'Disbursed');
-      return `<tr><td>${esc(l.id)}</td><td>${esc(mfsCustomer(l.customerId)?.name||'-')}</td><td>${state}</td><td>${mfsMoney(l.amount)}</td><td>${mfsMoney(l.balance)}</td><td><button class="mini-btn" onclick="mfsLifecycleDetail('${l.id}')">Timeline</button></td></tr>`;
-    }).join('');
-    openModal('Loan Lifecycle',`<div class="table-scroll"><table class="table"><thead><tr><th>LOAN</th><th>CUSTOMER</th><th>STAGE</th><th>DISBURSED</th><th>OUTSTANDING</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="6"><div class="empty">No loans</div></td></tr>'}</tbody></table></div>`);
-  };
-
-  window.mfsLifecycleDetail = function(id){
-    const l=mfsLoan(id), c=mfsCustomer(l?.customerId);
-    if(!l)return;
-    const events=[
-      [l.createdAt||l.start||today,'Loan created / disbursed'],
-      ...data.payments.filter(p=>p.loanId===id).sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(p=>[p.date,'Payment received · '+mfsMoney(p.amount)]),
-      ...(l.balance<=0?[[today,'Loan closed']]:[])
-    ];
-    openModal('Loan Timeline · '+id,`<div class="detail-list">${events.map(e=>`<span>${esc(e[0])}<b>${esc(e[1])}</b></span>`).join('')}</div><div class="settings-note" style="margin-top:12px">${esc(c?.name||'Customer')} · Outstanding ${mfsMoney(l.balance)}</div>`);
-  };
-
-  window.mfsNumberingCenter = function(){
-    const ncfg=data.mfsNumbering;
-    openModal('Document & Transaction Numbering',`
-      <form onsubmit="mfsSaveNumbering(event)">
-        <div class="form-grid">
-          ${['customer','loan','receipt','transaction','followup','agreement'].map(k=>`<label>${k[0].toUpperCase()+k.slice(1)} Prefix<input name="${k}" value="${esc(ncfg[k])}" maxlength="10"></label>`).join('')}
-        </div>
-        <div class="settings-note" style="margin-top:10px">Existing IDs are never rewritten. New records can use these prefixes.</div>
-        <div class="form-actions"><button class="btn green">Save Numbering</button></div>
-      </form>`);
-  };
-
-  window.mfsSaveNumbering = function(e){
-    e.preventDefault();
-    if(!guard(['Admin'])) return;
-    const f=new FormData(e.target);
-    Object.keys(data.mfsNumbering).forEach(k=>{const v=String(f.get(k)||'').trim().replace(/[^A-Za-z0-9]/g,'');if(v)data.mfsNumbering[k]=v});
-    save(); audit('Numbering rules updated','System','numbering',JSON.stringify(data.mfsNumbering));
-    toast('Numbering saved'); mfsNumberingCenter();
-  };
-
-  window.mfsImportExportCenter = function(){
-    openModal('Import / Export Center',`
-      <div class="data-actions">
-        <button class="btn" onclick="exportBackup()">Export Full Backup</button>
-        <button class="btn" onclick="mfsAccountingExport()">Export Accounting</button>
-        <button class="btn" onclick="exportProfessionalCSV('customers')">Customers CSV</button>
-        <button class="btn" onclick="exportProfessionalCSV('loans')">Loans CSV</button>
-        <button class="btn" onclick="exportProfessionalCSV('payments')">Payments CSV</button>
-        <button class="btn" onclick="mfsImportValidation()">Validate Backup</button>
-      </div>
-      <div class="settings-note" style="margin-top:12px">Imports are validated before replacing local data. Existing export tools remain available.</div>`);
-  };
-
-  window.mfsImportValidation = function(){
-    const input=document.createElement('input'); input.type='file'; input.accept='.json,application/json';
-    input.onchange=()=>{const f=input.files?.[0];if(!f)return;const r=new FileReader();
-      r.onload=()=>{try{
-        const x=JSON.parse(r.result), d=x.data||x, issues=[];
-        if(!Array.isArray(d.customers))issues.push('customers must be an array');
-        if(!Array.isArray(d.loans))issues.push('loans must be an array');
-        if(!Array.isArray(d.payments))issues.push('payments must be an array');
-        const ids=new Set(); (d.loans||[]).forEach(l=>{if(ids.has(l.id))issues.push('duplicate loan ID '+l.id);ids.add(l.id)});
-        const refs=new Set(); (d.payments||[]).forEach(p=>{const q=String(p.ref||p.reference||'').trim().toLowerCase();if(q){if(refs.has(q))issues.push('duplicate payment reference '+q);refs.add(q)}});
-        data.mfsImportLog.unshift({at:profNow(),file:f.name,valid:!issues.length,issues});
-        data.mfsImportLog=data.mfsImportLog.slice(0,50);save();
-        openModal('Backup Validation',issues.length?`<div class="alert-box">${issues.slice(0,20).map(x=>`<b>⚠ ${esc(x)}</b><br>`).join('')}</div>`:`<div class="settings-note">✓ Backup structure and duplicate checks passed.</div>`);
-      }catch(e){toast('Invalid JSON backup')}}; r.readAsText(f);
-    }; input.click();
-  };
-
-  /* Add exactly one entry point to the existing Professional Controls action area.
-     It checks for its own marker, so it cannot duplicate on repeated renders. */
-  const mfsOriginalProfessionalCenter = window.professionalCenter;
-  window.professionalCenter = function(){
-    if(typeof mfsOriginalProfessionalCenter==='function') mfsOriginalProfessionalCenter();
-    setTimeout(()=>{
-      const actions=document.querySelector('.pro-center .data-actions');
-      if(actions && !actions.querySelector('[data-mfs-next-control]')){
-        const b=document.createElement('button');
-        b.className='btn'; b.textContent='Control Center +';
-        b.dataset.mfsNextControl='1'; b.onclick=()=>mfsNextControlCenter();
-        actions.appendChild(b);
-      }
-    },0);
-  };
-
+  /* Add one non-duplicating Action Center button to the existing dashboard quick-action area. */
+  function muInstallActionButton(){
+    const candidates=[...document.querySelectorAll('button,a')].filter(x=>/quick action|action center/i.test(x.textContent||''));
+    const host=candidates[0]?.parentElement;
+    if(host&&!host.querySelector('[data-mithra-action-center]')){
+      const b=document.createElement('button'); b.className='btn'; b.textContent='Action Center'; b.dataset.mithraActionCenter='1'; b.onclick=()=>mithraActionCenter(); host.appendChild(b);
+    }
+  }
+  setTimeout(muInstallActionButton,300);
+  setInterval(()=>{ try{muInstallActionButton()}catch(e){} },5000);
   save();
 
 })();
