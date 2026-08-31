@@ -1368,4 +1368,319 @@ window.professionalCenter=professionalCenter;
   window.requestApproval=function(type,reference,amount,details){const x={id:'APR-'+Date.now(),type,reference,amount:n(amount),details:details||'',status:'Pending',requestedAt:profNow()};data.approvals.push(x);save();audit('Approval requested','Approval',x.id,type+' · '+money(amount));toast('Approval request created');return x};
 
   save();
+
+  /* =========================================================
+     MITHRA FINANCE SYSTEM — NEXT LEVEL CONTROL LAYER
+     Additive only: reuses existing UI/modal styles and data.
+     No existing function/page is replaced.
+     ========================================================= */
+
+  data.mfsSecurity = data.mfsSecurity || {
+    autoLockMinutes: 30,
+    requireApprovalAbove: 50000,
+    sessionStarted: profNow(),
+    lastActivity: profNow()
+  };
+  data.mfsNumbering = data.mfsNumbering || {
+    customer: 'CUS', loan: 'LN', receipt: 'RCT', transaction: 'TXN',
+    followup: 'FUP', agreement: 'AGR'
+  };
+  data.mfsCommunications = Array.isArray(data.mfsCommunications) ? data.mfsCommunications : [];
+  data.mfsDocuments = Array.isArray(data.mfsDocuments) ? data.mfsDocuments : [];
+  data.mfsLifecycle = data.mfsLifecycle || {};
+  data.mfsPromises = Array.isArray(data.mfsPromises) ? data.mfsPromises : [];
+  data.mfsRoute = data.mfsRoute || {};
+  data.mfsImportLog = Array.isArray(data.mfsImportLog) ? data.mfsImportLog : [];
+  save();
+
+  const mfsMoney = v => money(Number(v || 0));
+  const mfsMonth = d => String(d || today).slice(0,7);
+  const mfsDays = d => d ? Math.max(0, Math.floor((Date.parse(today)-Date.parse(d))/86400000)) : 0;
+  const mfsCustomer = id => data.customers.find(c => c.id === id);
+  const mfsLoan = id => data.loans.find(l => l.id === id);
+  const mfsMonthPayments = month => data.payments.filter(p => mfsMonth(p.date) === month);
+  const mfsMonthExpenses = month => (data.expenses || []).filter(x => mfsMonth(x.date) === month);
+
+  function mfsNextId(kind) {
+    const p = data.mfsNumbering[kind] || kind.toUpperCase();
+    const list = kind==='customer' ? data.customers :
+                 kind==='loan' ? data.loans :
+                 kind==='receipt' ? data.payments :
+                 kind==='transaction' ? [...data.payments, ...(data.expenses||[])] : [];
+    let max = 0;
+    list.forEach(x => {
+      const s = String(x.id || '');
+      const m = s.match(new RegExp('^' + p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '-(\\d+)$'));
+      if (m) max = Math.max(max, Number(m[1]));
+    });
+    return p + '-' + String(max + 1).padStart(6,'0');
+  }
+
+  function mfsKpiRows() {
+    const out = data.loans.reduce((s,l)=>s+Number(l.balance||0),0);
+    const overdue = overdueLoans().reduce((s,l)=>s+Number(l.balance||0),0);
+    const principal = data.loans.reduce((s,l)=>s+Number(l.amount||0),0);
+    const interest = data.loans.reduce((s,l)=>s+Number(l.interest||0),0);
+    const paid = data.payments.reduce((s,p)=>s+Number(p.amount||0),0);
+    const exp = (data.expenses||[]).reduce((s,x)=>s+Number(x.amount||0),0);
+    const recovery = principal ? Math.round((paid/principal)*100) : 0;
+    return {out,overdue,principal,interest,paid,exp,recovery};
+  }
+
+  window.mfsNextControlCenter = function(){
+    const k=mfsKpiRows();
+    const due=data.loans.filter(l=>Number(l.balance)>0 && l.due===today).length;
+    const critical=overdueLoans().filter(l=>mfsDays(l.due)>=31).length;
+    const pendingPromises=data.mfsPromises.filter(x=>x.status==='Pending').length;
+    openModal('Mithra Finance Control Center',`
+      <div class="pro-center">
+        <div class="cards">
+          <div class="card"><div class="label">Outstanding</div><div class="value">${mfsMoney(k.out)}</div></div>
+          <div class="card"><div class="label">Overdue</div><div class="value">${mfsMoney(k.overdue)}</div></div>
+          <div class="card"><div class="label">Recovery</div><div class="value">${k.recovery}%</div></div>
+          <div class="card"><div class="label">Critical 31+ Days</div><div class="value">${critical}</div></div>
+        </div>
+        <div class="data-actions">
+          <button class="btn" onclick="mfsAccountingCenter()">Accounting</button>
+          <button class="btn" onclick="mfsAnalyticsCenter()">Advanced Analytics</button>
+          <button class="btn" onclick="mfsSmartBICenter()">Smart Business Intelligence</button>
+          <button class="btn" onclick="mfsReminderCenter()">Reminder Center</button>
+          <button class="btn" onclick="mfsSecurityCenter()">Security & Roles</button>
+          <button class="btn" onclick="mfsLifecycleCenter()">Loan Lifecycle</button>
+          <button class="btn" onclick="mfsNumberingCenter()">Numbering</button>
+          <button class="btn" onclick="mfsImportExportCenter()">Import / Export</button>
+        </div>
+        <div class="settings-note">${due} due today · ${critical} critical overdue · ${pendingPromises} pending promises. Existing tools remain available separately.</div>
+      </div>`);
+  };
+
+  window.mfsAccountingCenter = function(){
+    const k=mfsKpiRows(), month=today.slice(0,7), mp=mfsMonthPayments(month), me=mfsMonthExpenses(month);
+    const cashIn=mp.filter(p=>String(p.mode||'Cash').toLowerCase()==='cash').reduce((s,p)=>s+Number(p.amount||0),0);
+    const digital=mp.reduce((s,p)=>s+Number(p.amount||0),0)-cashIn;
+    const expenses=me.reduce((s,x)=>s+Number(x.amount||0),0);
+    const net=digital+cashIn-expenses;
+    openModal('Accounting Center',`
+      <div class="cards">
+        <div class="card"><div class="label">Month Collections</div><div class="value">${mfsMoney(cashIn+digital)}</div></div>
+        <div class="card"><div class="label">Month Expenses</div><div class="value">${mfsMoney(expenses)}</div></div>
+        <div class="card"><div class="label">Net Movement</div><div class="value">${mfsMoney(net)}</div></div>
+        <div class="card"><div class="label">Portfolio Interest</div><div class="value">${mfsMoney(k.interest)}</div></div>
+      </div>
+      <div class="detail-list" style="margin-top:14px">
+        <span>Cash collections <b>${mfsMoney(cashIn)}</b></span>
+        <span>Digital collections <b>${mfsMoney(digital)}</b></span>
+        <span>Principal issued <b>${mfsMoney(k.principal)}</b></span>
+        <span>Total payments received <b>${mfsMoney(k.paid)}</b></span>
+        <span>Outstanding portfolio <b>${mfsMoney(k.out)}</b></span>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="mfsAccountingExport()">Export Accounting CSV</button>
+        <button class="btn light" onclick="dailyClosing()">Daily Closing</button>
+      </div>`);
+  };
+
+  window.mfsAccountingExport = function(){
+    const rows=[['Date','Type','Reference','Customer','Loan','Mode','Amount']];
+    data.payments.forEach(p=>rows.push([p.date,'Collection',p.id,mfsCustomer(mfsLoan(p.loanId)?.customerId)?.name||'',p.loanId,p.mode||'Cash',p.amount||0]));
+    (data.expenses||[]).forEach(x=>rows.push([x.date,'Expense',x.id||'',x.category||'', '',x.mode||'Cash',-(Number(x.amount||0))]));
+    downloadTextFile('mithra-accounting.csv',rows.map(r=>r.map(escapeCsv).join(',')).join('\n'),'text/csv');
+    toast('Accounting CSV exported');
+  };
+
+  window.mfsAnalyticsCenter = function(){
+    const months=[];
+    const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-5);
+    for(let i=0;i<6;i++){
+      const key=d.toISOString().slice(0,7);
+      const col=mfsMonthPayments(key).reduce((s,p)=>s+Number(p.amount||0),0);
+      const ex=mfsMonthExpenses(key).reduce((s,x)=>s+Number(x.amount||0),0);
+      const loans=data.loans.filter(l=>mfsMonth(l.createdAt||l.start)===key).reduce((s,l)=>s+Number(l.amount||0),0);
+      months.push({key,col,ex,loans,net:col-ex});
+      d.setMonth(d.getMonth()+1);
+    }
+    openModal('Advanced Analytics',`
+      <div class="table-scroll"><table class="table"><thead><tr><th>MONTH</th><th>COLLECTION</th><th>EXPENSE</th><th>NEW DISBURSED</th><th>NET</th></tr></thead>
+      <tbody>${months.map(x=>`<tr><td>${x.key}</td><td>${mfsMoney(x.col)}</td><td>${mfsMoney(x.ex)}</td><td>${mfsMoney(x.loans)}</td><td>${mfsMoney(x.net)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="detail-list" style="margin-top:14px">
+        <span>Current outstanding <b>${mfsMoney(mfsKpiRows().out)}</b></span>
+        <span>Overdue portfolio <b>${mfsMoney(mfsKpiRows().overdue)}</b></span>
+        <span>Recovery rate <b>${mfsKpiRows().recovery}%</b></span>
+      </div>`);
+  };
+
+  window.mfsSmartBICenter = function(){
+    const rows=data.customers.map(c=>{
+      const ls=data.loans.filter(l=>l.customerId===c.id);
+      const od=ls.filter(l=>Number(l.balance)>0 && l.due && l.due<today).reduce((s,l)=>s+Number(l.balance||0),0);
+      const late=ls.filter(l=>l.due&&l.due<today).reduce((s,l)=>s+mfsDays(l.due),0);
+      const score=Math.min(100, Math.round((od>0?45:0)+(late>30?25:late>7?12:0)+(ls.length>1?10:0)+(Number(c.balance||0)>50000?15:0)));
+      return {c,od,score};
+    }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,20);
+    openModal('Smart Business Intelligence',`
+      <div class="settings-note">Priority is based on existing repayment and overdue data. It is a decision-support signal, not an automatic credit decision.</div>
+      <div class="table-scroll"><table class="table"><thead><tr><th>PRIORITY</th><th>CUSTOMER</th><th>OUTSTANDING</th><th>OVERDUE</th><th>RISK</th><th>ACTION</th></tr></thead>
+      <tbody>${rows.map(x=>`<tr><td>${x.score>=60?'High':x.score>=30?'Medium':'Low'}</td><td><b>${esc(x.c.name)}</b></td><td>${mfsMoney(x.c.balance)}</td><td>${mfsMoney(x.od)}</td><td>${x.score}/100</td><td><button class="mini-btn" onclick="openCustomer('${x.c.id}')">Open</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No priority alerts</div></td></tr>'}</tbody></table></div>`);
+  };
+
+  window.mfsReminderCenter = function(){
+    const due=data.loans.filter(l=>Number(l.balance)>0 && l.due===today);
+    const od=overdueLoans();
+    const promised=data.mfsPromises.filter(x=>x.status==='Pending' && x.date<=today);
+    const rows=[
+      ...due.map(l=>({kind:'Due Today',c:mfsCustomer(l.customerId),l})),
+      ...od.slice(0,30).map(l=>({kind:'Overdue',c:mfsCustomer(l.customerId),l})),
+      ...promised.map(x=>({kind:'Promise Due',c:mfsCustomer(x.customerId),l:mfsLoan(x.loanId)}))
+    ];
+    openModal('Reminder Center',`
+      <div class="section-head"><h3>${rows.length} reminders</h3><button class="btn" onclick="mfsReminderExport()">Export List</button></div>
+      <div class="table-scroll"><table class="table"><thead><tr><th>TYPE</th><th>CUSTOMER</th><th>AMOUNT</th><th>DATE</th><th>ACTION</th></tr></thead>
+      <tbody>${rows.map(x=>`<tr><td>${esc(x.kind)}</td><td>${esc(x.c?.name||'-')}</td><td>${mfsMoney(x.l?.installment||x.l?.balance||0)}</td><td>${esc(x.l?.due||today)}</td><td><button class="mini-btn" onclick="mfsCopyReminder('${x.c?.id||''}','${x.l?.id||''}')">Copy Message</button></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No reminders pending</div></td></tr>'}</tbody></table></div>`);
+  };
+
+  window.mfsCopyReminder = function(cid,lid){
+    const c=mfsCustomer(cid), l=mfsLoan(lid);
+    const msg=`Mithra Finance System: Dear ${c?.name||'Customer'}, your payment of ${mfsMoney(l?.installment||l?.balance||0)} is due on ${l?.due||today}. Please contact us for payment details.`;
+    if(navigator.clipboard?.writeText) navigator.clipboard.writeText(msg).then(()=>toast('Reminder copied')).catch(()=>toast(msg));
+    else toast(msg);
+  };
+
+  window.mfsReminderExport = function(){
+    const rows=[['Type','Customer','Mobile','Loan','Due','Amount']];
+    data.loans.filter(l=>Number(l.balance)>0 && (l.due===today || l.due<today)).forEach(l=>{
+      const c=mfsCustomer(l.customerId); rows.push([l.due<today?'Overdue':'Due Today',c?.name||'',c?.mobile||'',l.id,l.due,l.installment||l.balance]);
+    });
+    downloadTextFile('mithra-reminders.csv',rows.map(r=>r.map(escapeCsv).join(',')).join('\n'),'text/csv');
+    toast('Reminder list exported');
+  };
+
+  window.mfsSecurityCenter = function(){
+    const s=data.settings||{}, sec=data.mfsSecurity;
+    const users=data.users||[];
+    openModal('Security & Roles',`
+      <div class="cards">
+        <div class="card"><div class="label">Current Role</div><div class="value">${esc(s.role||'Admin')}</div></div>
+        <div class="card"><div class="label">Users</div><div class="value">${users.length}</div></div>
+        <div class="card"><div class="label">Audit Entries</div><div class="value">${(data.auditLog||[]).length}</div></div>
+        <div class="card"><div class="label">Auto Lock</div><div class="value">${sec.autoLockMinutes}m</div></div>
+      </div>
+      <form onsubmit="mfsSaveSecurity(event)" style="margin-top:14px">
+        <div class="form-grid">
+          <label>Current Role<select name="role">${['Admin','Manager','Collector','Viewer'].map(r=>`<option ${s.role===r?'selected':''}>${r}</option>`).join('')}</select></label>
+          <label>Auto Lock Minutes<input name="autoLock" type="number" min="5" max="240" value="${sec.autoLockMinutes}"></label>
+          <label>Approval Above ₹<input name="approval" type="number" min="0" value="${sec.requireApprovalAbove}"></label>
+        </div>
+        <div class="form-actions"><button class="btn green">Save Security</button><button type="button" class="btn" onclick="mfsSecurityAudit()">Security Audit</button></div>
+      </form>`);
+  };
+
+  window.mfsSaveSecurity = function(e){
+    e.preventDefault();
+    if(!guard(['Admin'])) return;
+    const f=new FormData(e.target);
+    data.settings.role=String(f.get('role')||'Admin');
+    data.mfsSecurity.autoLockMinutes=Math.max(5,Number(f.get('autoLock'))||30);
+    data.mfsSecurity.requireApprovalAbove=Math.max(0,Number(f.get('approval'))||0);
+    data.mfsSecurity.lastActivity=profNow();
+    save(); audit('Security settings updated','System','security',data.settings.role);
+    toast('Security settings saved'); mfsSecurityCenter();
+  };
+
+  window.mfsSecurityAudit = function(){
+    const issues=[];
+    if(!data.settings.role) issues.push('No active role configured');
+    if(!(data.auditLog||[]).length) issues.push('Audit log is empty');
+    if(!data.settings.openingCash && data.settings.openingCash!==0) issues.push('Opening cash not configured');
+    openModal('Security Audit',`<div class="${issues.length?'alert-box':'settings-note'}">${issues.length?issues.map(x=>`<b>⚠ ${esc(x)}</b><br>`).join(''):'✓ Security baseline checks passed.'}</div>`);
+  };
+
+  window.mfsLifecycleCenter = function(){
+    const rows=data.loans.map(l=>{
+      const hasPay=data.payments.some(p=>p.loanId===l.id);
+      const state=l.balance<=0?'Closed':(l.status==='Overdue'?'Overdue':hasPay?'Repayment':'Disbursed');
+      return `<tr><td>${esc(l.id)}</td><td>${esc(mfsCustomer(l.customerId)?.name||'-')}</td><td>${state}</td><td>${mfsMoney(l.amount)}</td><td>${mfsMoney(l.balance)}</td><td><button class="mini-btn" onclick="mfsLifecycleDetail('${l.id}')">Timeline</button></td></tr>`;
+    }).join('');
+    openModal('Loan Lifecycle',`<div class="table-scroll"><table class="table"><thead><tr><th>LOAN</th><th>CUSTOMER</th><th>STAGE</th><th>DISBURSED</th><th>OUTSTANDING</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="6"><div class="empty">No loans</div></td></tr>'}</tbody></table></div>`);
+  };
+
+  window.mfsLifecycleDetail = function(id){
+    const l=mfsLoan(id), c=mfsCustomer(l?.customerId);
+    if(!l)return;
+    const events=[
+      [l.createdAt||l.start||today,'Loan created / disbursed'],
+      ...data.payments.filter(p=>p.loanId===id).sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(p=>[p.date,'Payment received · '+mfsMoney(p.amount)]),
+      ...(l.balance<=0?[[today,'Loan closed']]:[])
+    ];
+    openModal('Loan Timeline · '+id,`<div class="detail-list">${events.map(e=>`<span>${esc(e[0])}<b>${esc(e[1])}</b></span>`).join('')}</div><div class="settings-note" style="margin-top:12px">${esc(c?.name||'Customer')} · Outstanding ${mfsMoney(l.balance)}</div>`);
+  };
+
+  window.mfsNumberingCenter = function(){
+    const ncfg=data.mfsNumbering;
+    openModal('Document & Transaction Numbering',`
+      <form onsubmit="mfsSaveNumbering(event)">
+        <div class="form-grid">
+          ${['customer','loan','receipt','transaction','followup','agreement'].map(k=>`<label>${k[0].toUpperCase()+k.slice(1)} Prefix<input name="${k}" value="${esc(ncfg[k])}" maxlength="10"></label>`).join('')}
+        </div>
+        <div class="settings-note" style="margin-top:10px">Existing IDs are never rewritten. New records can use these prefixes.</div>
+        <div class="form-actions"><button class="btn green">Save Numbering</button></div>
+      </form>`);
+  };
+
+  window.mfsSaveNumbering = function(e){
+    e.preventDefault();
+    if(!guard(['Admin'])) return;
+    const f=new FormData(e.target);
+    Object.keys(data.mfsNumbering).forEach(k=>{const v=String(f.get(k)||'').trim().replace(/[^A-Za-z0-9]/g,'');if(v)data.mfsNumbering[k]=v});
+    save(); audit('Numbering rules updated','System','numbering',JSON.stringify(data.mfsNumbering));
+    toast('Numbering saved'); mfsNumberingCenter();
+  };
+
+  window.mfsImportExportCenter = function(){
+    openModal('Import / Export Center',`
+      <div class="data-actions">
+        <button class="btn" onclick="exportBackup()">Export Full Backup</button>
+        <button class="btn" onclick="mfsAccountingExport()">Export Accounting</button>
+        <button class="btn" onclick="exportProfessionalCSV('customers')">Customers CSV</button>
+        <button class="btn" onclick="exportProfessionalCSV('loans')">Loans CSV</button>
+        <button class="btn" onclick="exportProfessionalCSV('payments')">Payments CSV</button>
+        <button class="btn" onclick="mfsImportValidation()">Validate Backup</button>
+      </div>
+      <div class="settings-note" style="margin-top:12px">Imports are validated before replacing local data. Existing export tools remain available.</div>`);
+  };
+
+  window.mfsImportValidation = function(){
+    const input=document.createElement('input'); input.type='file'; input.accept='.json,application/json';
+    input.onchange=()=>{const f=input.files?.[0];if(!f)return;const r=new FileReader();
+      r.onload=()=>{try{
+        const x=JSON.parse(r.result), d=x.data||x, issues=[];
+        if(!Array.isArray(d.customers))issues.push('customers must be an array');
+        if(!Array.isArray(d.loans))issues.push('loans must be an array');
+        if(!Array.isArray(d.payments))issues.push('payments must be an array');
+        const ids=new Set(); (d.loans||[]).forEach(l=>{if(ids.has(l.id))issues.push('duplicate loan ID '+l.id);ids.add(l.id)});
+        const refs=new Set(); (d.payments||[]).forEach(p=>{const q=String(p.ref||p.reference||'').trim().toLowerCase();if(q){if(refs.has(q))issues.push('duplicate payment reference '+q);refs.add(q)}});
+        data.mfsImportLog.unshift({at:profNow(),file:f.name,valid:!issues.length,issues});
+        data.mfsImportLog=data.mfsImportLog.slice(0,50);save();
+        openModal('Backup Validation',issues.length?`<div class="alert-box">${issues.slice(0,20).map(x=>`<b>⚠ ${esc(x)}</b><br>`).join('')}</div>`:`<div class="settings-note">✓ Backup structure and duplicate checks passed.</div>`);
+      }catch(e){toast('Invalid JSON backup')}}; r.readAsText(f);
+    }; input.click();
+  };
+
+  /* Add exactly one entry point to the existing Professional Controls action area.
+     It checks for its own marker, so it cannot duplicate on repeated renders. */
+  const mfsOriginalProfessionalCenter = window.professionalCenter;
+  window.professionalCenter = function(){
+    if(typeof mfsOriginalProfessionalCenter==='function') mfsOriginalProfessionalCenter();
+    setTimeout(()=>{
+      const actions=document.querySelector('.pro-center .data-actions');
+      if(actions && !actions.querySelector('[data-mfs-next-control]')){
+        const b=document.createElement('button');
+        b.className='btn'; b.textContent='Control Center +';
+        b.dataset.mfsNextControl='1'; b.onclick=()=>mfsNextControlCenter();
+        actions.appendChild(b);
+      }
+    },0);
+  };
+
+  save();
+
 })();
