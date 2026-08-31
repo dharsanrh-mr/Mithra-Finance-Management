@@ -1705,4 +1705,90 @@ window.professionalCenter=professionalCenter;
   setTimeout(soInstall,700); setInterval(()=>{try{soInstall()}catch(e){}},5000);
   save();
 
+
+  /* ============================================================
+     MITHRA PREMIUM PRO UX
+     Additive-only visual/UX layer. Existing pages and functions
+     are preserved; no duplicate business pages are created.
+     ============================================================ */
+  data.mithraPro=data.mithraPro||{notificationsRead:{},lastSearch:''};
+  data.mithraPro.notificationsRead=data.mithraPro.notificationsRead||{};
+  save();
+
+  function mpProActions(){
+    const actions=[];
+    const overdue=data.loans.filter(l=>Number(l.balance)>0&&l.due&&l.due<today);
+    const due=data.loans.filter(l=>Number(l.balance)>0&&l.due===today);
+    const follow=(data.followups||[]).filter(f=>f.status!=='Done'&&f.date&&f.date<=today);
+    overdue.slice(0,8).forEach(l=>actions.push({kind:'Finance',level:'critical',text:`${muCust(l.customerId)?.name||'Customer'} · overdue`,detail:muMoney(l.balance),id:l.id,type:'Loan'}));
+    due.slice(0,8).forEach(l=>actions.push({kind:'Finance',level:'warning',text:`${muCust(l.customerId)?.name||'Customer'} · due today`,detail:muMoney(l.installment||l.balance),id:l.id,type:'Loan'}));
+    follow.slice(0,8).forEach(f=>actions.push({kind:'Follow-up',level:'warning',text:`${muCust(f.customerId)?.name||'Customer'} · follow-up`,detail:f.date,id:f.customerId,type:'Customer'}));
+    return actions;
+  }
+
+  window.mithraNotificationDrawer=function(){
+    const a=mpProActions(), unread=a.filter((x,i)=>!data.mithraPro.notificationsRead[i]).length;
+    openModal('Notification Center',`
+      <div class="mp-pro-notify-head"><span><b>${unread}</b> unread</span><button class="btn" onclick="mithraMarkNotificationsRead()">Mark all read</button></div>
+      <div class="mp-pro-notify-list">${a.map((x,i)=>`<button class="mp-pro-notify-item ${x.level}" onclick="mithraOpenNotification(${i})"><span class="mp-pro-dot"></span><span><b>${mpEsc(x.text)}</b><small>${mpEsc(x.kind)} · ${mpEsc(x.detail)}</small></span></button>`).join('')||'<div class="empty">No new notifications 🎉</div>'}</div>`);
+  };
+  window.mithraOpenNotification=function(i){
+    const a=mpProActions()[i]; if(!a)return;
+    data.mithraPro.notificationsRead[i]=true; save();
+    if(a.type==='Loan')return mfsLifecycleDetail(a.id);
+    if(a.type==='Customer')return openCustomer(a.id);
+  };
+  window.mithraMarkNotificationsRead=function(){
+    mpProActions().forEach((_,i)=>data.mithraPro.notificationsRead[i]=true);
+    save(); mithraNotificationDrawer();
+  };
+
+  window.mithraAdvancedSearch=function(){
+    openModal('Advanced Search',`
+      <div class="mp-search-box"><input id="mpProSearch" autofocus placeholder="Customer, mobile, loan ID, receipt ID..." oninput="mithraRunAdvancedSearch(this.value)"></div>
+      <div id="mpProResults" class="mp-pro-results"><div class="empty">Start typing to search existing records.</div></div>`);
+  };
+  window.mithraRunAdvancedSearch=function(q){
+    q=String(q||'').trim().toLowerCase();
+    data.mithraPro.lastSearch=q; save();
+    const box=document.getElementById('mpProResults'); if(!box)return;
+    if(!q){box.innerHTML='<div class="empty">Start typing to search existing records.</div>';return;}
+    const out=[];
+    data.customers.forEach(c=>{if(`${c.name} ${c.mobile} ${c.id}`.toLowerCase().includes(q))out.push({type:'Customer',id:c.id,title:c.name||c.id,sub:c.mobile||''})});
+    data.loans.forEach(l=>{if(`${l.id} ${l.customerId}`.toLowerCase().includes(q))out.push({type:'Loan',id:l.id,title:l.id,sub:soCust(l.customerId)?.name||''})});
+    data.payments.forEach(p=>{if(`${p.id} ${p.loanId} ${p.ref||p.reference||''}`.toLowerCase().includes(q))out.push({type:'Payment',id:p.id,title:p.id,sub:p.loanId||''})});
+    box.innerHTML=out.slice(0,25).map(x=>`<button class="mp-pro-result" onclick="mithraProOpen('${x.type}','${x.id}')"><span class="mp-pro-result-type">${mpEsc(x.type)}</span><b>${mpEsc(x.title)}</b><small>${mpEsc(x.sub)}</small></button>`).join('')||'<div class="empty">No matching records.</div>';
+  };
+  window.mithraProOpen=function(type,id){
+    if(type==='Customer')return openCustomer(id);
+    if(type==='Loan')return mfsLifecycleDetail(id);
+    if(type==='Payment')return mithraPaymentResult(id);
+  };
+
+  window.mithraExecutiveSnapshot=function(){
+    const a=mpProActions(), col=muCollection(muDaysAgo(30),today);
+    const outstanding=data.loans.reduce((s,l)=>s+Number(l.balance||0),0);
+    const overdue=data.loans.filter(l=>Number(l.balance)>0&&l.due&&l.due<today).reduce((s,l)=>s+Number(l.balance||0),0);
+    openModal('Executive Snapshot',`
+      <div class="mp-kpi-grid">
+        <div class="mp-kpi"><small>30-Day Collection</small><strong>${muMoney(col)}</strong><span>Recent actual payments</span></div>
+        <div class="mp-kpi"><small>Outstanding</small><strong>${muMoney(outstanding)}</strong><span>Current loan balances</span></div>
+        <div class="mp-kpi"><small>Overdue</small><strong>${muMoney(overdue)}</strong><span>Accounts requiring attention</span></div>
+        <div class="mp-kpi"><small>Actions</small><strong>${a.length}</strong><span>Open operational items</span></div>
+      </div>
+      <div class="mp-mini-note">Snapshot uses existing system data only and does not change transactions.</div>`);
+  };
+
+  function mpProInstall(){
+    const top=document.querySelector('.top-actions');
+    if(top&&!top.querySelector('[data-mithra-pro-tools]')){
+      const wrap=document.createElement('div');wrap.dataset.mithraProTools='1';wrap.className='mp-pro-tools';
+      wrap.innerHTML=`<button class="icon-btn" title="Notifications" onclick="mithraNotificationDrawer()">🔔</button><button class="icon-btn" title="Advanced Search" onclick="mithraAdvancedSearch()">⌕</button><button class="icon-btn" title="Executive Snapshot" onclick="mithraExecutiveSnapshot()">◈</button>`;
+      top.insertBefore(wrap,top.firstChild);
+    }
+    document.querySelectorAll('table').forEach(t=>{if(!t.dataset.mithraSticky){t.dataset.mithraSticky='1';t.classList.add('mp-smart-table')}});
+  }
+  setTimeout(mpProInstall,500); setInterval(()=>{try{mpProInstall()}catch(e){}},5000);
+  save();
+
 })();
