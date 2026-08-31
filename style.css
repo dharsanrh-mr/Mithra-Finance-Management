@@ -73,3 +73,20 @@
   border-radius:16px;
   padding:20px;
 }
+
+/* Alignment fix: keep dashboard/page actions and every form modal properly aligned on mobile. */
+#modal.modal{position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;height:100dvh !important;display:grid !important;place-items:center !important;padding:16px !important;margin:0 !important;overflow:auto !important;z-index:9999 !important;}
+#modal.modal.hidden{display:none !important;}
+#modal .modal-card{width:min(680px,calc(100vw - 32px)) !important;max-height:calc(100dvh - 32px) !important;margin:auto !important;overflow-y:auto !important;position:relative !important;}
+@media(max-width:760px){
+  .title{display:flex !important;flex-direction:column !important;align-items:stretch !important;gap:12px !important;margin-bottom:18px !important;}
+  .title>div:first-child{width:100% !important;}
+  .title .actions{width:100% !important;display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;}
+  .title .actions .btn{width:100% !important;min-height:46px !important;}
+  .title .actions .btn:last-child{grid-column:1/-1 !important;}
+  #modal.modal{padding:12px !important;}
+  #modal .modal-card{width:calc(100vw - 24px) !important;max-height:calc(100dvh - 24px) !important;padding:16px !important;border-radius:14px !important;}
+  #modal .form-grid{grid-template-columns:1fr !important;gap:12px !important;}
+  #modal .field[style*="grid-column"]{grid-column:1/-1 !important;}
+  #modal .form-actions{display:flex !important;justify-content:flex-end !important;flex-wrap:wrap !important;gap:8px !important;}
+}
