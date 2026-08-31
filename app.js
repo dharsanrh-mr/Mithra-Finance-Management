@@ -1047,3 +1047,101 @@ addExpense=function(e){if(!guard(['Admin','Manager']))return;e.preventDefault();
 /* Existing exports remain available; this adds an auditable professional backup. */
 const _exportBackupOriginal=exportBackup;
 exportBackup=function(){try{data.meta={...(data.meta||{}),exportedAt:profNow(),version:'FINOVA Professional'};audit('Backup exported','System','backup','Local JSON backup');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finova-professional-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}catch(e){toast('Backup failed');}};
+
+/* FINOVA Professional+ Pack — additive functionality; existing navigation/design preserved. */
+(function(){
+  data.followUps=data.followUps||[]; data.auditLog=data.auditLog||[]; data.cashClosings=data.cashClosings||[];
+  data.pdc=data.pdc||[]; data.guarantors=data.guarantors||[]; data.documents=data.documents||[]; data.recycleBin=data.recycleBin||[];
+  data.branches=data.branches||[{id:'BR-001',name:'Main Branch',active:true}];
+  data.targets=data.targets||{}; data.monthLocks=data.monthLocks||{};
+  data.customers.forEach(c=>{c.riskScore=Number(c.riskScore||0);c.guarantorId=c.guarantorId||'';c.documents=Array.isArray(c.documents)?c.documents:[]});
+  data.loans.forEach(l=>{l.pdcIds=Array.isArray(l.pdcIds)?l.pdcIds:[];l.guarantorId=l.guarantorId||'';l.branchId=l.branchId||data.branches[0].id});
+  save();
+})();
+
+function riskScore(c){
+  const ls=data.loans.filter(l=>l.customerId===c.id&&l.balance>0), overdue=ls.filter(l=>l.due&&l.due<today).length;
+  const ps=data.payments.filter(p=>p.customerId===c.id); const late=Math.min(5,overdue); const score=Math.min(100,late*15+Math.min(30,ls.reduce((s,l)=>s+l.balance,0)/(Math.max(1,c.borrowed||1))*30)+Math.max(0,10-ps.length));
+  return Math.round(score);
+}
+function riskLabel(score){return score>=60?'High':score>=30?'Medium':'Low'}
+function professionalCenter(){
+  const overdue=overdueLoans(), todayDue=data.loans.filter(l=>l.balance>0&&l.due===today).length;
+  openModal('Professional Controls',`<div class="pro-center">
+    <div class="cards"><div class="card"><div class="label">High Risk</div><div class="value">${data.customers.filter(c=>riskScore(c)>=60).length}</div></div><div class="card"><div class="label">PDC Pending</div><div class="value">${data.pdc.filter(x=>x.status==='Pending').length}</div></div><div class="card"><div class="label">Documents</div><div class="value">${data.documents.length}</div></div><div class="card"><div class="label">Recycle Bin</div><div class="value">${data.recycleBin.length}</div></div></div>
+    <div class="data-actions"><button class="btn" onclick="targetManager()">Collection Targets</button><button class="btn" onclick="pdcManager()">PDC / Cheques</button><button class="btn" onclick="guarantorManager()">Guarantors</button><button class="btn" onclick="documentManager()">Documents</button><button class="btn" onclick="riskManager()">Risk Scores</button><button class="btn" onclick="lockManager()">Month Lock</button><button class="btn" onclick="recycleManager()">Recycle Bin</button><button class="btn" onclick="systemHealth()">System Health</button></div>
+    <div class="settings-note">${todayDue} due today · ${overdue.length} overdue. These tools add controls without changing the existing page layout.</div>
+  </div>`);
+}
+function targetManager(){
+  const key=today.slice(0,7), t=data.targets[key]||{daily:0,weekly:0,monthly:0};
+  openModal('Collection Targets',`<form onsubmit="saveTargets(event)"><div class="form-grid"><label>Daily Target<input name="daily" type="number" value="${t.daily||0}"></label><label>Weekly Target<input name="weekly" type="number" value="${t.weekly||0}"></label><label>Monthly Target<input name="monthly" type="number" value="${t.monthly||0}"></label></div><div class="form-actions"><button type="button" class="btn light" onclick="professionalCenter()">Cancel</button><button class="btn green">Save</button></div></form>`);
+}
+function saveTargets(e){e.preventDefault();const f=new FormData(e.target),key=today.slice(0,7);data.targets[key]={daily:+f.get('daily')||0,weekly:+f.get('weekly')||0,monthly:+f.get('monthly')||0};save();audit('Collection targets updated','System',key,'Targets saved');toast('Targets saved');professionalCenter()}
+function pdcManager(){
+  const rows=data.pdc.map(x=>{const c=getCustomer(x.customerId);return `<tr><td>${esc(x.chequeNo)}</td><td>${esc(c?.name||'-')}</td><td>${money(x.amount)}</td><td>${x.dueDate}</td><td>${esc(x.bank||'-')}</td><td><span class="status ${String(x.status).toLowerCase()}">${x.status}</span></td><td><button class="mini-btn" onclick="updatePdc('${x.id}')">Update</button></td></tr>`}).join('');
+  openModal('PDC / Cheque Management',`<div class="section-head"><h3>Cheques</h3><button class="btn green" onclick="addPdc()">+ Add PDC</button></div><div class="table-scroll"><table class="table"><thead><tr><th>CHEQUE</th><th>CUSTOMER</th><th>AMOUNT</th><th>DATE</th><th>BANK</th><th>STATUS</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7"><div class="empty">No PDC records</div></td></tr>'}</tbody></table></div>`);
+}
+function addPdc(){
+  openModal('Add PDC / Cheque',`<form onsubmit="savePdc(event)"><div class="form-grid"><label>Customer<select name="customerId" required>${data.customers.map(c=>`<option value="${c.id}">${esc(c.name)} · ${esc(c.mobile||'')}</option>`).join('')}</select></label><label>Loan<select name="loanId">${data.loans.map(l=>`<option value="${l.id}">${l.id}</option>`).join('')}</select></label><label>Cheque Number<input name="chequeNo" required></label><label>Bank<input name="bank"></label><label>Amount<input name="amount" type="number" required></label><label>Due Date<input name="dueDate" type="date" value="${today}" required></label></div><div class="form-actions"><button type="button" class="btn light" onclick="pdcManager()">Cancel</button><button class="btn green">Save PDC</button></div></form>`)
+}
+function savePdc(e){e.preventDefault();const f=new FormData(e.target),x={id:'PDC-'+Date.now(),customerId:f.get('customerId'),loanId:f.get('loanId'),chequeNo:f.get('chequeNo'),bank:f.get('bank'),amount:+f.get('amount')||0,dueDate:f.get('dueDate'),status:'Pending',createdAt:profNow()};data.pdc.unshift(x);save();audit('PDC added','PDC',x.id,`${x.chequeNo} · ${money(x.amount)}`);toast('PDC saved');pdcManager()}
+function updatePdc(id){const x=data.pdc.find(p=>p.id===id);if(!x)return;const status=prompt('Status: Pending / Deposited / Cleared / Returned',x.status);if(status&&['Pending','Deposited','Cleared','Returned'].includes(status)){x.status=status;save();audit('PDC status updated','PDC',id,status);pdcManager()}}
+function guarantorManager(){
+  openModal('Guarantors',`<div class="section-head"><h3>Guarantor Registry</h3><button class="btn green" onclick="addGuarantor()">+ Add Guarantor</button></div><div class="table-scroll"><table class="table"><thead><tr><th>NAME</th><th>MOBILE</th><th>RELATION</th><th>LINKED LOANS</th></tr></thead><tbody>${data.guarantors.map(g=>`<tr><td><b>${esc(g.name)}</b></td><td>${esc(g.mobile||'-')}</td><td>${esc(g.relation||'-')}</td><td>${data.loans.filter(l=>l.guarantorId===g.id).length}</td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">No guarantors</div></td></tr>'}</tbody></table></div>`)
+}
+function addGuarantor(){openModal('Add Guarantor',`<form onsubmit="saveGuarantor(event)"><div class="form-grid"><label>Name<input name="name" required></label><label>Mobile<input name="mobile"></label><label>Relationship<input name="relation"></label><label>Address<input name="address"></label></div><div class="form-actions"><button type="button" class="btn light" onclick="guarantorManager()">Cancel</button><button class="btn green">Save</button></div></form>`)}
+function saveGuarantor(e){e.preventDefault();const f=new FormData(e.target),g={id:'G-'+Date.now(),name:f.get('name'),mobile:f.get('mobile'),relation:f.get('relation'),address:f.get('address')};data.guarantors.push(g);save();audit('Guarantor added','Guarantor',g.id,g.name);toast('Guarantor saved');guarantorManager()}
+function documentManager(){
+  openModal('Document Management',`<form onsubmit="saveDocument(event)"><div class="form-grid"><label>Customer<select name="customerId">${data.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label><label>Document Type<select name="type"><option>ID Proof</option><option>Address Proof</option><option>Agreement</option><option>Other</option></select></label><label>Document Reference<input name="ref" placeholder="File name / reference"></label><label>Status<select name="status"><option>Pending</option><option>Verified</option><option>Rejected</option></select></label></div><div class="form-actions"><button class="btn green">Add Document</button></div></form><div class="table-scroll" style="margin-top:15px"><table class="table"><thead><tr><th>CUSTOMER</th><th>TYPE</th><th>REFERENCE</th><th>STATUS</th></tr></thead><tbody>${data.documents.map(d=>{const c=getCustomer(d.customerId);return `<tr><td>${esc(c?.name||'-')}</td><td>${esc(d.type)}</td><td>${esc(d.ref||'-')}</td><td>${esc(d.status)}</td></tr>`}).join('')||'<tr><td colspan="4"><div class="empty">No documents</div></td></tr>'}</tbody></table></div>`)
+}
+function saveDocument(e){e.preventDefault();const f=new FormData(e.target),d={id:'DOC-'+Date.now(),customerId:f.get('customerId'),type:f.get('type'),ref:f.get('ref'),status:f.get('status'),createdAt:profNow()};data.documents.push(d);save();audit('Document added','Document',d.id,d.type);toast('Document saved');documentManager()}
+function riskManager(){
+  const rows=data.customers.map(c=>{const s=riskScore(c),label=riskLabel(s);return `<tr><td><b>${esc(c.name)}</b><small>${esc(c.mobile||'')}</small></td><td>${s}/100</td><td><span class="status ${label.toLowerCase()}">${label}</span></td><td>${data.loans.filter(l=>l.customerId===c.id&&l.balance>0).length}</td><td>${money(data.loans.filter(l=>l.customerId===c.id).reduce((a,l)=>a+l.balance,0))}</td></tr>`}).join('');openModal('Customer Risk Scores',`<div class="table-scroll"><table class="table"><thead><tr><th>CUSTOMER</th><th>SCORE</th><th>RISK</th><th>ACTIVE LOANS</th><th>OUTSTANDING</th></tr></thead><tbody>${rows}</tbody></table></div>`)}
+function lockManager(){
+  const months=[...new Set([...data.payments.map(x=>(x.date||'').slice(0,7)),...data.expenses.map(x=>(x.date||'').slice(0,7)),today.slice(0,7)])].filter(Boolean).sort().reverse();
+  openModal('Month Lock',`<div class="settings-note">Lock a month after reconciliation. Existing screens remain unchanged; locked periods are protected by transaction checks.</div><div class="table-scroll"><table class="table"><thead><tr><th>MONTH</th><th>STATUS</th><th></th></tr></thead><tbody>${months.map(m=>`<tr><td>${m}</td><td>${data.monthLocks[m]?'Locked':'Open'}</td><td><button class="mini-btn" onclick="toggleMonthLock('${m}')">${data.monthLocks[m]?'Unlock':'Lock'}</button></td></tr>`).join('')}</tbody></table></div>`)
+}
+function toggleMonthLock(m){if(data.monthLocks[m]){if(!guard(['Admin']))return;delete data.monthLocks[m];audit('Month unlocked','System',m,'Period reopened')}else{if(!guard(['Admin','Manager']))return;data.monthLocks[m]=true;audit('Month locked','System',m,'Period locked')}save();lockManager()}
+function recycleManager(){openModal('Recycle Bin',`<div class="section-head"><h3>Deleted Records</h3><button class="btn danger-btn" onclick="emptyRecycleBin()">Empty Bin</button></div><div class="table-scroll"><table class="table"><thead><tr><th>TYPE</th><th>ID</th><th>DELETED</th><th></th></tr></thead><tbody>${data.recycleBin.map(x=>`<tr><td>${esc(x.type)}</td><td>${esc(x.id)}</td><td>${esc(x.deletedAt||'')}</td><td><button class="mini-btn" onclick="restoreRecycle('${x.recycleId}')">Restore</button></td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">Recycle bin empty</div></td></tr>'}</tbody></table></div>`)}
+function restoreRecycle(id){const x=data.recycleBin.find(r=>r.recycleId===id);if(!x)return;data[x.type+'s']=data[x.type+'s']||[];data[x.type+'s'].push(x.record);data.recycleBin=data.recycleBin.filter(r=>r.recycleId!==id);save();audit('Record restored','Recycle Bin',id,x.type);toast('Record restored');recycleManager()}
+function emptyRecycleBin(){if(!guard(['Admin']))return;if(confirm('Empty recycle bin?')){data.recycleBin=[];save();audit('Recycle bin emptied','System','recycle','All deleted records removed');recycleManager()}}
+function systemHealth(){const raw=JSON.stringify(data), bytes=new Blob([raw]).size, lastBackup=data.meta?.exportedAt||'Never', integrity=data.customers.every(c=>c.id&&c.name)&&data.loans.every(l=>l.id&&l.customerId&&Number.isFinite(Number(l.balance)));openModal('System Health',`<div class="detail-list"><span>Data integrity <b>${integrity?'OK':'Needs review'}</b></span><span>Customers <b>${data.customers.length}</b></span><span>Loans <b>${data.loans.length}</b></span><span>Payments <b>${data.payments.length}</b></span><span>Expenses <b>${data.expenses.length}</b></span><span>Storage <b>${(bytes/1024).toFixed(1)} KB</b></span><span>Last backup <b>${esc(lastBackup)}</b></span><span>Branch count <b>${data.branches.length}</b></span></div>`)}
+function exportProfessionalPlus(){data.meta={...(data.meta||{}),exportedAt:profNow(),version:'FINOVA Professional+'};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finova-professional-plus-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);toast('Professional+ backup exported')}
+
+/* Additive access point in Settings only; no navigation or visual redesign. */
+const _settingsPlus=appSettings;
+appSettings=function(){_settingsPlus();setTimeout(()=>{const root=document.querySelector('.settings-grid');if(root&&!document.getElementById('proPlusCard')){root.insertAdjacentHTML('beforeend',`<div class="section" id="proPlusCard"><div class="section-head"><div><h3>Professional+ Controls</h3><p class="muted">Advanced operations, compliance and portfolio controls</p></div></div><div class="data-actions"><button class="btn" onclick="professionalCenter()">Open Professional Center</button><button class="btn" onclick="exportProfessionalPlus()">Export Full Backup</button></div></div>`)}},0)};
+window.appSettings=appSettings;
+
+/* Integrity guards for Professional+ */
+const _collectPaymentPlus=collectPayment;
+collectPayment=function(e,loanId){
+  const l=data.loans.find(x=>x.id===loanId); const date=e?.target?new FormData(e.target).get('date'):today; const month=String(date||today).slice(0,7);
+  if(data.monthLocks?.[month]){toast('This month is locked. Unlock it from Professional Center.');return}
+  const f=e?.target?new FormData(e.target):null; const amount=Number(f?.get('amount')||0); const ref=String(f?.get('ref')||'').trim();
+  if(ref && data.payments.some(p=>String(p.ref||'').trim()===ref)){toast('Duplicate reference / UTR detected');return}
+  return _collectPaymentPlus(e,loanId);
+};
+window.collectPayment=collectPayment;
+
+const _addExpensePlus=addExpense;
+addExpense=function(e){
+  const f=new FormData(e.target), month=String(f.get('date')||today).slice(0,7);
+  if(data.monthLocks?.[month]){toast('This month is locked. Unlock it from Professional Center.');return}
+  return _addExpensePlus(e);
+};
+window.addExpense=addExpense;
+
+/* Branch registry: additive, local-first support for future multi-branch use. */
+function branchManager(){openModal('Branch Management',`<div class="section-head"><h3>Branches</h3><button class="btn green" onclick="addBranch()">+ Add Branch</button></div><div class="table-scroll"><table class="table"><thead><tr><th>ID</th><th>BRANCH</th><th>STATUS</th><th></th></tr></thead><tbody>${data.branches.map(b=>`<tr><td>${esc(b.id)}</td><td><b>${esc(b.name)}</b></td><td>${b.active?'Active':'Inactive'}</td><td><button class="mini-btn" onclick="toggleBranch('${b.id}')">Toggle</button></td></tr>`).join('')}</tbody></table></div>`)}
+function addBranch(){openModal('Add Branch',`<form onsubmit="saveBranch(event)"><div class="form-grid"><label>Branch Name<input name="name" required></label></div><div class="form-actions"><button type="button" class="btn light" onclick="branchManager()">Cancel</button><button class="btn green">Save Branch</button></div></form>`)}
+function saveBranch(e){e.preventDefault();const name=new FormData(e.target).get('name').trim();if(!name)return;const b={id:'BR-'+String(data.branches.length+1).padStart(3,'0'),name,active:true};data.branches.push(b);save();audit('Branch added','Branch',b.id,name);toast('Branch added');branchManager()}
+function toggleBranch(id){const b=data.branches.find(x=>x.id===id);if(!b)return;b.active=!b.active;save();audit('Branch status changed','Branch',id,b.active?'Active':'Inactive');branchManager()}
+
+const _professionalCenter=professionalCenter;
+professionalCenter=function(){
+  _professionalCenter();
+  setTimeout(()=>{const a=document.querySelector('.pro-center .data-actions');if(a&&!a.querySelector('[data-branch]'))a.insertAdjacentHTML('beforeend','<button class="btn" data-branch onclick="branchManager()">Branches</button>')},0);
+};
+window.professionalCenter=professionalCenter;
