@@ -26,8 +26,20 @@ data.settings=(data.settings&&typeof data.settings==="object")?data.settings:{};
 if(separateSettings&&typeof separateSettings==="object") data.settings={...data.settings,...separateSettings};
 if(!Number.isFinite(Number(data.settings.openingCash))) data.settings.openingCash=50000;
 data.customers.forEach(c=>{c.borrowed=Number(c.borrowed||0);c.balance=Number(c.balance||0)});
-data.loans.forEach(l=>{l.amount=Number(l.amount||0);l.interest=Number(l.interest||0);l.balance=Number(l.balance??((l.amount||0)+(l.interest||0)));l.status=l.balance<=0?"Closed":(l.status||"Active");l.payments=Array.isArray(l.payments)?l.payments:[]});
+data.loans.forEach(l=>{l.amount=Number(l.amount||0);l.interest=Number(l.interest||0);l.balance=Number(l.balance??((l.amount||0)+(l.interest||0)));l.status=l.balance<=0?"Closed":(l.status||"Active");l.payments=Array.isArray(l.payments)?l.payments:[];l.followUp=(l.followUp&&typeof l.followUp==="object")?l.followUp:{};l.followUp.status=l.followUp.status||"Pending";l.followUp.nextDate=l.followUp.nextDate||""});
 const money=n=>"₹"+Number(n||0).toLocaleString("en-IN");
+const isDueToday=l=>Number(l?.balance||0)>0&&l?.due===today;
+const isOverdue=l=>Number(l?.balance||0)>0&&(l?.status==="Overdue"||l?.due<today);
+const dueTarget=l=>Math.min(Number(l?.balance||0),Number(l?.installment||5000));
+const todayDueLoans=()=>data.loans.filter(isDueToday);
+const todayDueAmount=()=>todayDueLoans().reduce((s,l)=>s+dueTarget(l),0);
+const currentMonthLoans=()=>data.loans.filter(l=>(l.createdAt||l.start||"").slice(0,7)===today.slice(0,7));
+const followUpDue=l=>Number(l?.balance||0)>0&&l?.followUp?.nextDate&&l.followUp.nextDate<=today&&l.followUp.status!=="Done";
+const followUpCount=()=>data.loans.filter(followUpDue).length;
+const nextReceiptId=()=>{const prefix=(data.settings?.receiptPrefix||"RC").toUpperCase();const nums=data.payments.map(p=>{const m=String(p.id||"").match(/(\d+)$/);return m?Number(m[1]):0});return prefix+"-"+String(Math.max(0,...nums)+1).padStart(5,"0")};
+
+const paymentModeTotals=()=>{const out={cash:0,upi:0,bank:0};data.payments.forEach(p=>{const m=(p.mode||"Cash").toLowerCase(),v=Number(p.amount||0);if(m==="cash")out.cash+=v;else if(m==="upi")out.upi+=v;else if(["bank","bank transfer","neft","rtgs","imps"].includes(m))out.bank+=v});return out};
+const cashPosition=()=>{const opening=Number(data.settings?.openingCash||0),mode=paymentModeTotals(),expenses=data.expenses.reduce((s,e)=>s+Number(e.amount||0),0);return Math.max(0,opening+mode.cash-expenses)};
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));localStorage.setItem(SETTINGS_KEY,JSON.stringify(data.settings||{}));};
 const saveData=save;
 const getCustomer=id=>data.customers.find(c=>c.id===id);const loanStatus=l=>l.status;
@@ -40,13 +52,13 @@ function render(p,q=""){
   const views={dashboard,customers,loans,collections,dues,cashbook,expenses,reports,settings:appSettings};
   (views[p]||dashboard)(q);
 }
-function dashboard(){let active=data.loans.filter(l=>l.status==="Active"||l.status==="Overdue").length,dis=data.loans.reduce((a,l)=>a+l.amount,0),out=data.loans.reduce((a,l)=>a+l.balance,0),col=data.payments.filter(p=>p.date===today).reduce((a,p)=>a+p.amount,0),over=data.loans.filter(l=>l.status==="Overdue"),due=data.loans.filter(l=>l.status==="Active");
+function dashboard(){let active=data.loans.filter(l=>l.balance>0).length,dis=data.loans.reduce((a,l)=>a+l.amount,0),out=data.loans.reduce((a,l)=>a+l.balance,0),col=data.payments.filter(p=>p.date===today).reduce((a,p)=>a+p.amount,0),over=data.loans.filter(isOverdue),due=todayDueLoans(),mode=paymentModeTotals();
 page.innerHTML=title("Dashboard","Complete finance overview for today",`<button class="btn green" onclick="openCustomer()">+ New Customer</button><button class="btn" onclick="openLoan()">+ New Loan</button><button class="btn light" onclick="openPayment()">Collect Payment</button>`)+
 `<div class="cards">
 <div class="card metric"><div><div class="label">Today's Collection</div><div class="value">${money(col)}</div><div class="sub">↑ Payments received</div></div><div class="metric-icon">↙</div></div>
-<div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(16500)}</div><div class="sub">Collection target</div></div><div class="metric-icon">◷</div></div>
+<div class="card metric"><div><div class="label">Today's Due</div><div class="value">${money(todayDueAmount())}</div><div class="sub">${due.length} loans due today</div></div><div class="metric-icon">◷</div></div>
 <div class="card metric"><div><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((a,l)=>a+l.balance,0))}</div><div class="sub" style="color:#d34d59">${over.length} customers need follow-up</div></div><div class="metric-icon">!</div></div>
-<div class="card metric"><div><div class="label">New Loans</div><div class="value">${data.loans.filter(l=>l.due===today).length}</div><div class="sub">This period</div></div><div class="metric-icon">▣</div></div>
+<div class="card metric"><div><div class="label">New Loans</div><div class="value">${currentMonthLoans().length}</div><div class="sub">This month</div></div><div class="metric-icon">▣</div></div>
 </div>
 <div class="cards" style="margin-top:14px">
 <div class="card"><div class="label">Active Customers</div><div class="value">${data.customers.length}</div></div>
@@ -56,8 +68,8 @@ page.innerHTML=title("Dashboard","Complete finance overview for today",`<button 
 </div>
 <div class="layout2"><div class="section"><div class="section-head"><h3>Collection Performance</h3><span class="muted">Daily · Last 6 months</span></div><div class="bars">${[52,68,45,75,61,88].map((h,i)=>`<div class="bar" style="height:${h}%"><span>${["Mar","Apr","May","Jun","Jul","Aug"][i]}</span></div>`).join("")}</div></div>
 <div class="section"><div class="section-head"><h3>Loan Portfolio</h3><span class="muted">Live status</span></div><div class="donut"></div><div class="legend"><span>● Active</span><span>● Due</span><span>● Overdue</span></div></div></div>
-<div class="layout2"><div class="section"><div class="section-head"><h3>🔴 Overdue Customers</h3><button class="btn light" onclick="render('dues')">View All</button></div>${over.map(l=>{let c=getCustomer(l.customerId);return `<div class="alert-box"><div><b>${c?.name||"Customer"}</b><small>${l.id} · ${Math.max(1,Math.ceil((Date.now()-new Date(l.due))/86400000))} days overdue</small></div><div style="text-align:right"><div class="amount-red">${money(l.balance)}</div><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button></div></div>`}).join("")||`<div class="empty">No overdue loans 🎉</div>`}</div>
-<div class="section"><div class="section-head"><h3>💰 Money Position</h3></div><div class="kpis"><div class="kpi"><span>Cash</span><b>${money(125000)}</b></div><div class="kpi"><span>UPI</span><b>${money(42500)}</b></div><div class="kpi"><span>Bank</span><b>${money(80000)}</b></div></div><div class="kpi" style="margin-top:10px"><span>Total Available</span><b>${money(247500)}</b></div></div></div>
+<div class="layout2"><div class="section"><div class="section-head"><h3>🔴 Overdue Customers</h3><button class="btn light" onclick="render('dues')">View All</button></div>${over.map(l=>{let c=getCustomer(l.customerId);return `<div class="alert-box"><div><b>${c?.name||"Customer"}</b><small>${l.id} · ${Math.max(1,Math.ceil((Date.now()-new Date(l.due))/86400000))} days overdue</small></div><div style="text-align:right"><div class="amount-red">${money(l.balance)}</div><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button> <button class="mini-btn" onclick="openFollowUp('${l.id}')">Follow-up</button></div></div>`}).join("")||`<div class="empty">No overdue loans 🎉</div>`}</div>
+<div class="section"><div class="section-head"><h3>💰 Money Position</h3></div><div class="kpis"><div class="kpi"><span>Cash</span><b>${money(mode.cash)}</b></div><div class="kpi"><span>UPI</span><b>${money(mode.upi)}</b></div><div class="kpi"><span>Bank</span><b>${money(mode.bank)}</b></div></div><div class="kpi" style="margin-top:10px"><span>Total Available</span><b>${money(cashPosition()+mode.upi+mode.bank)}</b></div></div></div>
 <div class="section" style="margin-top:17px"><div class="section-head"><h3>📅 Today's Due</h3><button class="btn light" onclick="render('dues')">View All</button></div>${due.map(l=>{let c=getCustomer(l.customerId);return `<div class="due-row"><div class="person"><div class="avatar">${c.name[0]}</div><div><b>${c?.name||"Customer"}</b><small>${l.id}</small></div></div><div>${money(Math.min(5000,l.balance))}</div><div>${l.due}</div><span class="status due">Due</span><button class="mini-btn" onclick="openPayment('${l.id}')">Collect</button></div>`}).join("")}</div>
 <div class="layout2"><div class="section"><div class="section-head"><h3>Recent Transactions</h3><button class="btn light" onclick="render('collections')">View All</button></div><div class="transactions">${data.payments.slice(-5).reverse().map(p=>{let c=getCustomer(p.customerId);return `<div class="txn"><div class="txn-left"><div class="txn-icon">↙</div><div><b>${c?.name||"Customer"} payment</b><small>${p.date} · ${p.mode}</small></div></div><span class="positive">+ ${money(p.amount)}</span></div>`}).join("")}</div></div>
 <div class="section"><div class="section-head"><h3>Recent Loans</h3><button class="btn light" onclick="render('loans')">View All</button></div>${loanTable(data.loans.slice().reverse().slice(0,4))}</div></div>`}
@@ -188,7 +200,7 @@ function loanQuickFilter(status){
   setTimeout(()=>{const e=document.getElementById("loanStatus");if(e){e.value=status;filterLoans();}},0);
 }
 function loanMenu(id){
-  openModal("Loan Actions",`<div class="quick-menu"><button onclick="loanDetail('${id}')">View Loan</button><button onclick="loanSchedule('${id}')">View Repayment Schedule</button><button onclick="openPayment('${id}')">Collect Payment</button><button onclick="loanStatement('${id}')">Print Loan Statement</button><button onclick="loanWhatsapp('${id}')">WhatsApp Reminder</button><button onclick="editLoan('${id}')">Edit Loan</button></div>`);
+  openModal("Loan Actions",`<div class="quick-menu"><button onclick="loanDetail('${id}')">View Loan</button><button onclick="loanSchedule('${id}')">View Repayment Schedule</button><button onclick="openPayment('${id}')">Collect Payment</button><button onclick="loanStatement('${id}')">Print Loan Statement</button><button onclick="loanWhatsapp('${id}')">WhatsApp Reminder</button><button onclick="openFollowUp('${id}')">Follow-up</button><button onclick="editLoan('${id}')">Edit Loan</button></div>`);
 }
 function paymentTable(){
   const ps=[...data.payments].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
@@ -202,7 +214,7 @@ function collections(){
   const todayTotal=data.payments.filter(p=>p.date===today).reduce((s,p)=>s+Number(p.amount||0),0);
   const total=data.payments.reduce((s,p)=>s+Number(p.amount||0),0);
   const avg=data.payments.length?total/data.payments.length:0;
-  page.innerHTML=title("Collections","Fast payment collection, receipts and payment history",`<button class="btn green" onclick="openCollectionPicker()">+ Collect Payment</button>`)+
+  page.innerHTML=title("Collections","Fast payment collection, receipts and payment history",`<button class="btn" onclick="exportCollectionsCsv()">Export CSV</button><button class="btn green" onclick="openCollectionPicker()">+ Collect Payment</button>`)+
   `<div class="cards">
     <div class="card metric"><div><div class="label">Today's Collection</div><div class="value">${money(todayTotal)}</div></div><div class="metric-icon">₹</div></div>
     <div class="card metric"><div><div class="label">Total Collected</div><div class="value">${money(total)}</div></div><div class="metric-icon">↗</div></div>
@@ -211,11 +223,23 @@ function collections(){
   </div>
   <div class="section" style="margin-top:17px">${paymentTable()}</div>`;
 }
+function exportCollectionsCsv(){
+  const rows=[['Receipt','Date','Customer','Loan','Amount','Mode','Reference','Notes','Balance After']];
+  [...data.payments].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(p=>{const c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);rows.push([p.id,p.date||'',c?.name||'',p.loanId||'',Number(p.amount||0),p.mode||'',p.ref||'',p.notes||'',Number(p.balanceAfter??l?.balance??0)]);});
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`finova-collections-${today}.csv`;a.click();URL.revokeObjectURL(a.href);toast('Collections CSV exported');
+}
 function openCollectionPicker(){
   const loans=data.loans.filter(l=>l.balance>0);
   openModal("Select Loan",`<div class="collection-picker">${loans.length?loans.map(l=>{const c=getCustomer(l.customerId);return `<button class="picker-row" onclick="openPayment('${l.id}')"><span><b>${c?.name||"Customer"}</b><small>${l.id} · Outstanding ${money(l.balance)}</small></span><strong>Collect</strong></button>`}).join(""):`<div class="empty">No active loan with outstanding balance</div>`}</div>`);
 }
-function dues(){let over=data.loans.filter(l=>l.status==="Overdue"),up=data.loans.filter(l=>l.status==="Active");page.innerHTML=title("Due Management","Today's due, upcoming due and overdue follow-up",`<button class="btn green" onclick="openPayment()">Collect Payment</button>`)+`<div class="cards"><div class="card"><div class="label">Today's Due</div><div class="value">${money(16500)}</div></div><div class="card"><div class="label">Upcoming Loans</div><div class="value">${up.length}</div></div><div class="card"><div class="label">Overdue</div><div class="value">${over.length}</div></div><div class="card"><div class="label">Overdue Amount</div><div class="value">${money(over.reduce((a,l)=>a+l.balance,0))}</div></div></div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Overdue Follow-up</h3></div>${loanTable(over)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Upcoming / Due</h3></div>${loanTable(up)}</div>`}
+function dues(){let over=data.loans.filter(isOverdue),todayLoans=todayDueLoans(),up=data.loans.filter(l=>l.balance>0&&!isOverdue(l)&&l.due>today),fu=data.loans.filter(followUpDue);page.innerHTML=title("Due Management","Today's due, upcoming due and overdue follow-up",`<button class="btn green" onclick="openPayment()">Collect Payment</button>`)+`<div class="cards"><div class="card"><div class="label">Today's Due</div><div class="value">${money(todayDueAmount())}</div></div><div class="card"><div class="label">Upcoming Loans</div><div class="value">${up.length}</div></div><div class="card"><div class="label">Overdue</div><div class="value">${over.length}</div></div><div class="card"><div class="label">Follow-up Due</div><div class="value">${fu.length}</div></div></div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Overdue Follow-up</h3><span class="muted">${over.length} loans · ${money(over.reduce((a,l)=>a+l.balance,0))}</span></div>${followUpTable(over)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Follow-up Due Today</h3></div>${followUpTable(fu)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Today / Due</h3></div>${loanTable(todayLoans)}</div><div class="section" style="margin-top:17px"><div class="section-head"><h3>Upcoming</h3></div>${loanTable(up)}</div>`}
+function followUpTable(arr){if(!arr.length)return `<div class="empty">No follow-up items</div>`;return `<div class="table-scroll"><table class="table"><thead><tr><th>LOAN</th><th>CUSTOMER</th><th>OUTSTANDING</th><th>FOLLOW-UP</th><th>NEXT DATE</th><th>ACTIONS</th></tr></thead><tbody>${arr.map(l=>{const c=getCustomer(l.customerId),f=l.followUp||{};return `<tr><td><b>${l.id}</b><small>${l.due||"-"}</small></td><td><b>${c?.name||"Unknown"}</b><small>${c?.mobile||""}</small></td><td><b>${money(l.balance)}</b></td><td><span class="status ${String(f.status||"Pending").toLowerCase().replace(/ /g,"-")}">${f.status||"Pending"}</span>${f.notes?`<small>${escx(f.notes)}</small>`:""}</td><td>${f.nextDate||"Not set"}</td><td><div class="row-actions"><button class="mini-btn" onclick="openFollowUp('${l.id}')">Update</button><button class="mini-btn" onclick="loanWhatsapp('${l.id}')">Remind</button></div></td></tr>`}).join("")}</tbody></table></div>`}
+function openFollowUp(id){const l=data.loans.find(x=>x.id===id);if(!l)return;const c=getCustomer(l.customerId),f=l.followUp||{};openModal("Follow-up · "+(c?.name||"Customer"),`<form onsubmit="saveFollowUp(event,'${id}')"><div class="payment-summary"><div><span>Loan</span><b>${l.id}</b></div><div><span>Outstanding</span><b>${money(l.balance)}</b></div><div><span>Due</span><b>${l.due||"-"}</b></div></div><div class="form-grid"><div class="field"><label>Status</label><select name="status"><option ${f.status==="Pending"?"selected":""}>Pending</option><option ${f.status==="Contacted"?"selected":""}>Contacted</option><option ${f.status==="Promised"?"selected":""}>Promised</option><option ${f.status==="Done"?"selected":""}>Done</option></select></div><div class="field"><label>Next Follow-up Date</label><input name="nextDate" type="date" value="${f.nextDate||today}"></div><div class="field" style="grid-column:1/-1"><label>Notes</label><textarea name="notes" placeholder="Call outcome / promise / notes">${escx(f.notes||"")}</textarea></div></div><div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Save Follow-up</button></div></form>`)}
+function saveFollowUp(e,id){e.preventDefault();const l=data.loans.find(x=>x.id===id),f=new FormData(e.target);if(!l)return;l.followUp={status:f.get("status"),nextDate:f.get("nextDate"),notes:f.get("notes"),updatedAt:new Date().toISOString()};save();closeModal();toast("Follow-up updated");render("dues");}
+function requestDueNotifications(){if(!data.settings?.dueReminder)return;if(!("Notification" in window))return;if(Notification.permission==="default")Notification.requestPermission().catch(()=>{});if(Notification.permission!=="granted")return;const items=getNotifications().filter(x=>x.title.startsWith("Overdue")||x.title.includes("due today")||x.title.startsWith("Follow-up"));items.slice(0,5).forEach(x=>{try{new Notification("FINOVA · "+x.title,{body:x.text})}catch(e){}})}
+
+
 function cashbookModeTotals(){
   const todayPays=data.payments.filter(p=>p.date===today);
   const cash=todayPays.filter(p=>(p.mode||"Cash").toLowerCase()==="cash").reduce((a,p)=>a+Number(p.amount||0),0);
@@ -602,7 +626,7 @@ function addLoan(e){
   e.preventDefault();const f=new FormData(e.target),customerId=f.get("customerId"),amount=+(f.get("amount")||0),rate=+(f.get("rate")||0),tenure=+(f.get("tenure")||1),interest=amount*rate/100,total=amount+interest,installment=total/tenure;
   if(!customerId||!amount){toast("Select a customer and enter loan amount");return;}
   const id="LN-"+String(data.loans.length+123).padStart(5,"0");
-  data.loans.push({id,customerId,amount,balance:total,interest,rate,interestType:f.get("interestType"),type:f.get("type"),tenure,start:f.get("start"),due:f.get("due"),frequency:f.get("frequency"),installment,status:"Active",payments:[]});
+  data.loans.push({id,customerId,amount,balance:total,interest,rate,interestType:f.get("interestType"),type:f.get("type"),tenure,start:f.get("start"),due:f.get("due"),frequency:f.get("frequency"),installment,createdAt:new Date().toISOString(),status:"Active",payments:[]});
   const c=getCustomer(customerId);c.borrowed=(c.borrowed||0)+amount;c.balance=(c.balance||0)+total;
   save();closeModal();toast("Loan created");render("loans");
 }
@@ -651,33 +675,35 @@ function editLoan(id){
 function saveLoanEdit(e,id){
   e.preventDefault();const l=data.loans.find(x=>x.id===id),f=new FormData(e.target);l.due=f.get("due");l.status=f.get("status");l.frequency=f.get("frequency");if(l.balance<=0)l.status="Closed";save();closeModal();toast("Loan updated");render("loans");
 }
-function openPayment(loanId){
-  const l=data.loans.find(x=>x.id===loanId),c=getCustomer(l?.customerId);if(!l||!c)return;
+function openPayment(loanId){   if(!loanId){openCollectionPicker();return;}   const l=data.loans.find(x=>x.id===loanId),c=getCustomer(l?.customerId);if(!l||!c)return;
   openModal("Collect Payment",`<form onsubmit="collectPayment(event,'${loanId}')">
     <div class="payment-summary"><div><span>Customer</span><b>${c.name}</b></div><div><span>Loan</span><b>${l.id}</b></div><div><span>Outstanding</span><b>${money(l.balance)}</b></div></div>
-    <div class="form-grid"><div class="field"><label>Amount *</label><input name="amount" type="number" min="1" max="${l.balance}" value="${Math.min(l.balance,l.installment||5000)}" required></div><div class="field"><label>Payment Mode</label><select name="mode"><option>Cash</option><option>UPI</option><option>Bank</option></select></div><div class="field"><label>Payment Date</label><input name="date" type="date" value="${today}" required></div><div class="field"><label>Notes</label><input name="notes"></div></div>
+    <div class="form-grid"><div class="field"><label>Amount *</label><input name="amount" type="number" min="1" max="${l.balance}" value="${Math.min(l.balance,l.installment||5000)}" required></div><div class="field"><label>Payment Mode</label><select name="mode"><option>Cash</option><option>UPI</option><option>Bank</option></select></div><div class="field"><label>Payment Date</label><input name="date" type="date" value="${today}" required></div><div class="field"><label>Reference / UTR</label><input name="ref" placeholder="Optional transaction reference"></div><div class="field"><label>Notes</label><input name="notes"></div></div>
     <div class="form-actions"><button type="button" class="btn light" onclick="closeModal()">Cancel</button><button class="btn green">Collect Payment</button></div>
   </form>`);
 }
 function collectPayment(e,loanId){
   e.preventDefault();const f=new FormData(e.target),l=data.loans.find(x=>x.id===loanId),c=getCustomer(l.customerId),amount=+(f.get("amount")||0);
   if(!l||amount<=0||amount>l.balance){toast("Enter a valid payment amount");return;}
-  const id="RC-"+String(data.payments.length+4).padStart(5,"0");
-  data.payments.push({id,loanId,customerId:c.id,amount,date:f.get("date"),mode:f.get("mode"),notes:f.get("notes")});
-  l.balance=Math.max(0,l.balance-amount);
+  const id=nextReceiptId();
+  const previousBalance=Number(l.balance||0),paymentDate=f.get("date")||today;
+  const newBalance=Math.max(0,previousBalance-amount);
+  data.payments.push({id,loanId,customerId:c.id,amount,date:paymentDate,mode:f.get("mode"),ref:f.get("ref"),notes:f.get("notes"),previousBalance,balanceAfter:newBalance,createdAt:new Date().toISOString()});
+  l.balance=newBalance;
   c.balance=Math.max(0,c.balance-amount);
   l.status=l.balance<=0?"Closed":(l.due<today?"Overdue":"Active");
+  if(l.balance<=0){l.followUp={...(l.followUp||{}),status:"Done",nextDate:""};}
   save();closeModal();toast("Payment collected · "+id);render("loans");
 }
 function receipt(id){
   let p=data.payments.find(x=>x.id===id),c=getCustomer(p.customerId),l=data.loans.find(x=>x.id===p.loanId);
-  const previous=(l?.balance||0)+p.amount;
-  const msg=encodeURIComponent(`FINOVA FINANCE Payment Receipt%0AReceipt: ${p.id}%0ACustomer: ${c.name}%0ALoan: ${l.id}%0APaid: ${money(p.amount)}%0ABalance: ${money(l.balance)}%0ADate: ${p.date}%0AMode: ${p.mode}`);
+  const previous=Number(p.previousBalance??((l?.balance||0)+Number(p.amount||0)));const after=Number(p.balanceAfter??(l?.balance||0));
+  const msg=encodeURIComponent(`FINOVA FINANCE Payment Receipt%0AReceipt: ${p.id}%0ACustomer: ${c.name}%0ALoan: ${l.id}%0APaid: ${money(p.amount)}%0ABalance: ${money(after)}%0ADate: ${p.date}%0AMode: ${p.mode}`);
   openModal("Payment Receipt",`<div id="printReceipt" class="receipt">
     <div class="receipt-brand"><div class="logo">₹</div><div><h2>FINOVA FINANCE</h2><span>Official Payment Receipt</span></div></div>
     <div class="receipt-grid"><div><span>Receipt No</span><b>${p.id}</b></div><div><span>Date</span><b>${p.date}</b></div><div><span>Customer</span><b>${c.name}</b></div><div><span>Loan No</span><b>${l.id}</b></div></div>
     <div class="receipt-amount"><span>Payment Received</span><strong>${money(p.amount)}</strong></div>
-    <div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(l.balance)}</b></div><div><span>Payment Mode</span><b>${p.mode}</b></div><div><span>Reference</span><b>${p.ref||"-"}</b></div></div>
+    <div class="receipt-grid"><div><span>Previous Outstanding</span><b>${money(previous)}</b></div><div><span>Balance Outstanding</span><b>${money(after)}</b></div><div><span>Payment Mode</span><b>${p.mode}</b></div><div><span>Reference</span><b>${p.ref||"-"}</b></div></div>
     <div class="receipt-note">Thank you for your payment. Please keep this receipt for your records.</div>
   </div>
   <div class="form-actions">
@@ -802,6 +828,7 @@ function getNotifications(){
   const recent=(data.payments||[]).filter(p=>p.date===today).slice(0,3);
   const items=[];
   overdue.slice(0,4).forEach(l=>{const c=getCustomer(l.customerId);items.push({title:`Overdue: ${c?.name||'Customer'}`,text:`${l.id} · ${money(l.balance)} outstanding`,page:'dues'});});
+  (data.loans||[]).filter(followUpDue).slice(0,4).forEach(l=>{const c=getCustomer(l.customerId);items.push({title:`Follow-up due: ${c?.name||'Customer'}`,text:`${l.id} · ${money(l.balance)} outstanding`,page:'dues'});});
   due.slice(0,3).forEach(l=>{const c=getCustomer(l.customerId);items.push({title:`Payment due today: ${c?.name||'Customer'}`,text:`${l.id} · ${money(l.installment||l.balance||0)}`,page:'dues'});});
   recent.forEach(p=>items.push({title:'Payment received',text:`${p.id} · ${money(p.amount)} · ${p.mode||'Cash'}`,page:'collections'}));
   return items;
@@ -828,6 +855,7 @@ function appLogout(){
 document.addEventListener('DOMContentLoaded',()=>{
   const nb=document.getElementById('notificationBtn'), pb=document.getElementById('profileBtn');
   renderNotifications();
+  setTimeout(requestDueNotifications,500);
   nb?.addEventListener('click',e=>{e.stopPropagation();const m=document.getElementById('notificationMenu');const open=m.classList.contains('hidden');closeTopMenus();if(open){m.classList.remove('hidden');nb.setAttribute('aria-expanded','true');}});
   pb?.addEventListener('click',e=>{e.stopPropagation();const m=document.getElementById('profileMenu');const open=m.classList.contains('hidden');closeTopMenus();if(open){m.classList.remove('hidden');pb.setAttribute('aria-expanded','true');}});
   document.addEventListener('click',e=>{if(!e.target.closest('.top-menu-wrap'))closeTopMenus()});

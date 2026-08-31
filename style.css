@@ -366,3 +366,6 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
   .modal-backdrop>.modal{width:min(600px,calc(100vw - 48px))}
   #modal .modal-card{width:min(760px,calc(100vw - 48px))}
 }
+/* FINOVA follow-up enhancements — keeps the existing visual language */
+.table td small{display:block;margin-top:3px}
+.status.pending{background:#fff4db;color:#9a6a00}.status.contacted{background:#eaf4ff;color:#2467a8}.status.promised{background:#f1ebff;color:#6840a5}.status.done{background:#e9f8f0;color:#178654}
