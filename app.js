@@ -1791,4 +1791,85 @@ window.professionalCenter=professionalCenter;
   setTimeout(mpProInstall,500); setInterval(()=>{try{mpProInstall()}catch(e){}},5000);
   save();
 
+
+  /* ============================================================
+     MITHRA CONTEXT ACTIONS
+     Additive-only contextual buttons. Existing actions preserved.
+     ============================================================ */
+  window.mithraCopy=function(text){
+    navigator.clipboard?.writeText(String(text)).then(()=>toast('Copied')).catch(()=>toast('Copy unavailable'));
+  };
+  window.mithraResetFilters=function(){
+    document.querySelectorAll('input[type="search"],input[placeholder*="Search"],select').forEach(el=>{
+      if(el.dataset.mithraKeep) return;
+      if(el.tagName==='SELECT') el.selectedIndex=0; else el.value='';
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      el.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    toast('Filters reset');
+  };
+  window.mithraPrintCurrent=function(){window.print();};
+
+  window.mithraCustomerActions=function(id){
+    const c=soCust(id); if(!c)return;
+    mpPushRecent('Customer',id,c.name||id);
+    openModal('Customer Actions',`
+      <div class="mp-action-grid">
+        <button class="mp-action-btn" onclick="openCustomer('${id}')"><b>👤 View Customer</b><small>Open profile</small></button>
+        <button class="mp-action-btn" onclick="mfsLifecycleDetail('${(data.loans.find(l=>l.customerId===id)||{}).id||''}');"><b>💳 View Loan</b><small>Open linked loan</small></button>
+        <button class="mp-action-btn" onclick="mithraRecentPinned();"><b>★ Quick Access</b><small>Pinned & recent</small></button>
+        <button class="mp-action-btn" onclick="mithraPin('Customer','${id}','${mpEsc(c.name||id)}')"><b>📌 Pin</b><small>Keep for quick access</small></button>
+        <button class="mp-action-btn" onclick="mithraCopy('${mpEsc(id)}')"><b>⧉ Copy ID</b><small>Copy customer ID</small></button>
+      </div>`);
+  };
+
+  window.mithraLoanActions=function(id){
+    const l=soLoan(id); if(!l)return;
+    mpPushRecent('Loan',id,id);
+    openModal('Loan Actions',`
+      <div class="mp-action-grid">
+        <button class="mp-action-btn" onclick="mfsLifecycleDetail('${id}')"><b>💳 View Loan</b><small>Open loan details</small></button>
+        <button class="mp-action-btn" onclick="mithraBalanceExplain('${id}')"><b>🧮 Balance Breakdown</b><small>Explain current balance</small></button>
+        <button class="mp-action-btn" onclick="mithraPaymentPattern('${id}')"><b>📈 Payment Pattern</b><small>Review payment behaviour</small></button>
+        <button class="mp-action-btn" onclick="mithraCopy('${mpEsc(id)}')"><b>⧉ Copy Loan ID</b><small>Copy identifier</small></button>
+        <button class="mp-action-btn" onclick="mithraPrintCurrent()"><b>🖨️ Print</b><small>Print current view</small></button>
+      </div>`);
+  };
+
+  window.mithraDueActions=function(id){
+    const l=soLoan(id); if(!l)return;
+    openModal('Due Actions',`
+      <div class="mp-action-grid">
+        <button class="mp-action-btn primary" onclick="mfsLifecycleDetail('${id}')"><b>💰 Collect</b><small>Open loan for collection</small></button>
+        <button class="mp-action-btn" onclick="mithraCustomerActions('${l.customerId}')"><b>📞 Follow-up</b><small>Open customer actions</small></button>
+        <button class="mp-action-btn" onclick="mithraCopy('${mpEsc(id)}')"><b>⧉ Copy Loan ID</b><small>Copy identifier</small></button>
+        <button class="mp-action-btn" onclick="mithraBalanceExplain('${id}')"><b>🧮 Balance</b><small>See calculation</small></button>
+      </div>`);
+  };
+
+  function mithraInjectContextButtons(){
+    // Add one compact "More" button to existing table rows where a record ID is detectable.
+    document.querySelectorAll('table tbody tr').forEach(row=>{
+      if(row.dataset.mithraContext) return;
+      const text=(row.textContent||'').trim();
+      const loanMatch=text.match(/\b(LN[-_A-Z0-9]+)\b/i);
+      const custMatch=text.match(/\b(CUS[-_A-Z0-9]+)\b/i);
+      const payMatch=text.match(/\b(RCT[-_A-Z0-9]+|PAY[-_A-Z0-9]+)\b/i);
+      const id=loanMatch?.[1]||custMatch?.[1]||payMatch?.[1];
+      if(!id)return;
+      row.dataset.mithraContext='1';
+      const cell=document.createElement('td');
+      cell.className='mp-context-cell';
+      const b=document.createElement('button');
+      b.className='icon-btn mp-more-btn'; b.title='More actions'; b.textContent='⋮';
+      if(loanMatch)b.onclick=()=>mithraLoanActions(id);
+      else if(custMatch)b.onclick=()=>mithraCustomerActions(id);
+      else b.onclick=()=>mithraPaymentResult(id);
+      cell.appendChild(b); row.appendChild(cell);
+    });
+  }
+  setTimeout(mithraInjectContextButtons,900);
+  setInterval(()=>{try{mithraInjectContextButtons()}catch(e){}},5000);
+  save();
+
 })();

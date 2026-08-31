@@ -478,3 +478,19 @@ input,select,textarea,button{max-width:100%;box-sizing:border-box}
 .mp-mini-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08);font-size:.9rem}
 .mp-smart-table thead th{position:sticky;top:0;z-index:2}
 @media(max-width:600px){.mp-kpi-grid{grid-template-columns:1fr}.mp-pro-tools{gap:3px}}
+
+/* ============================================================
+   MITHRA CONTEXT ACTIONS — additive UI
+   ============================================================ */
+.mp-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.mp-action-btn{
+  border:1px solid var(--border,#e5e7eb);background:var(--card,#fff);
+  border-radius:12px;padding:12px;text-align:left;cursor:pointer;
+  display:flex;flex-direction:column;gap:4px;transition:transform .15s ease,box-shadow .15s ease;
+}
+.mp-action-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(0,0,0,.07)}
+.mp-action-btn small{opacity:.62}
+.mp-action-btn.primary{font-weight:600}
+.mp-context-cell{width:1%;white-space:nowrap;text-align:right}
+.mp-more-btn{min-width:34px}
+@media(max-width:600px){.mp-action-grid{grid-template-columns:1fr}}
