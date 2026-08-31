@@ -1872,4 +1872,125 @@ window.professionalCenter=professionalCenter;
   setInterval(()=>{try{mithraInjectContextButtons()}catch(e){}},5000);
   save();
 
+
+  /* ============================================================
+     MITHRA CONTROL & CONVENIENCE
+     Additive-only: saved views, timeline, task board, summary
+     drawer, table preferences, alert snooze, mobile action bar.
+     ============================================================ */
+  data.mithraControl=data.mithraControl||{
+    savedViews:[], tasks:[], snoozed:{}, tableDensity:'comfortable',
+    visibleColumns:{}, mobileBar:true
+  };
+  data.mithraControl.savedViews=Array.isArray(data.mithraControl.savedViews)?data.mithraControl.savedViews:[];
+  data.mithraControl.tasks=Array.isArray(data.mithraControl.tasks)?data.mithraControl.tasks:[];
+  data.mithraControl.snoozed=data.mithraControl.snoozed||{};
+  save();
+
+  window.mithraSavedViews=function(){
+    openModal('Saved Views',`
+      <div class="mc-toolbar"><button class="btn" onclick="mithraSaveCurrentView()">＋ Save Current View</button><button class="btn" onclick="mithraResetFilters()">Reset Filters</button></div>
+      <div class="mc-list">${data.mithraControl.savedViews.map((v,i)=>`
+        <div class="mc-list-row"><div><b>${mpEsc(v.name)}</b><small>${mpEsc(v.query||'All filters')}</small></div>
+        <div class="mc-row-actions"><button class="icon-btn" onclick="mithraApplyView(${i})">Open</button><button class="icon-btn" onclick="mithraDeleteView(${i})">×</button></div></div>
+      `).join('')||'<div class="empty">No saved views yet.</div>'}</div>`);
+  };
+  window.mithraSaveCurrentView=function(){
+    const name=prompt('Name this view');
+    if(!name)return;
+    const query=[...document.querySelectorAll('input[type="search"],input[placeholder*="Search"]')].map(x=>x.value).find(Boolean)||'';
+    const filters=[...document.querySelectorAll('select')].map(x=>x.value).filter(Boolean);
+    data.mithraControl.savedViews.unshift({name,query,filters,at:profNow()});
+    data.mithraControl.savedViews=data.mithraControl.savedViews.slice(0,20);save();
+    toast('View saved');mithraSavedViews();
+  };
+  window.mithraApplyView=function(i){
+    const v=data.mithraControl.savedViews[i];if(!v)return;
+    const search=[...document.querySelectorAll('input[type="search"],input[placeholder*="Search"]')].find(x=>x.offsetParent!==null);
+    if(search&&v.query){search.value=v.query;search.dispatchEvent(new Event('input',{bubbles:true}));}
+    [...document.querySelectorAll('select')].forEach((s,j)=>{if(v.filters?.[j]!==undefined){s.value=v.filters[j];s.dispatchEvent(new Event('change',{bubbles:true));}});
+    toast('View applied');closeModal();
+  };
+  window.mithraDeleteView=function(i){data.mithraControl.savedViews.splice(i,1);save();mithraSavedViews();};
+
+  window.mithraTimeline=function(type,id){
+    const events=[];
+    const c=type==='Customer'?soCust(id):null;
+    if(c)events.push({date:c.createdAt||c.created||today,title:'Customer created',detail:c.name||id});
+    data.loans.filter(l=>type==='Customer'?l.customerId===id:l.id===id).forEach(l=>{
+      events.push({date:l.start||l.createdAt||today,title:'Loan opened',detail:`${l.id} · ${muMoney(l.amount||l.principal||0)}`});
+      soPayments(l.id).forEach(p=>events.push({date:p.date||today,title:'Payment recorded',detail:`${p.id} · ${muMoney(p.amount)}`}));
+    });
+    (data.followups||[]).filter(f=>type==='Customer'?f.customerId===id:f.loanId===id).forEach(f=>events.push({date:f.date||today,title:'Follow-up',detail:f.note||f.status||'Follow-up'}));
+    events.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    openModal(`${type} Timeline`,`<div class="mc-timeline">${events.slice(0,60).map(e=>`<div class="mc-timeline-item"><div class="mc-timeline-dot"></div><div><b>${mpEsc(e.title)}</b><small>${mpEsc(e.date)} · ${mpEsc(e.detail)}</small></div></div>`).join('')||'<div class="empty">No activity available.</div>'}</div>`);
+  };
+
+  window.mithraSummaryDrawer=function(type,id){
+    const c=type==='Customer'?soCust(id):null,l=type==='Loan'?soLoan(id):(c?data.loans.find(x=>x.customerId===id):null);
+    if(!c&&!l)return;
+    const cust=c||soCust(l.customerId), loans=c?data.loans.filter(x=>x.customerId===id):[l];
+    const outstanding=loans.reduce((s,x)=>s+Number(x.balance||0),0);
+    openModal('Record Summary',`
+      <div class="mc-summary-head"><div><small>${mpEsc(type)}</small><h3>${mpEsc(cust?.name||l?.id||id)}</h3></div><span class="mp-status">${l?.status||'CUSTOMER'}</span></div>
+      <div class="mc-summary-grid">
+        <div><small>Mobile</small><b>${mpEsc(cust?.mobile||'-')}</b></div>
+        <div><small>Loans</small><b>${loans.length}</b></div>
+        <div><small>Outstanding</small><b>${muMoney(outstanding)}</b></div>
+        <div><small>Last Payment</small><b>${mpEsc((data.payments.filter(p=>loans.some(x=>x.id===p.loanId)).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||{}).date||'-')}</b></div>
+      </div>
+      <div class="mc-toolbar"><button class="btn" onclick="mithraTimeline('${c?'Customer':'Loan'}','${mpEsc(c?cust.id:l.id)}')">Timeline</button><button class="btn" onclick="mithraPrintCurrent()">Print</button></div>`);
+  };
+
+  window.mithraTaskBoard=function(){
+    const t=data.mithraControl.tasks;
+    openModal('Task Board',`
+      <div class="mc-toolbar"><button class="btn" onclick="mithraAddTask()">＋ Add Task</button></div>
+      <div class="mc-task-grid">${['To Do','In Progress','Done'].map(status=>`
+        <section class="mc-task-col"><h4>${status}</h4>${t.filter(x=>x.status===status).map(x=>`<div class="mc-task"><b>${mpEsc(x.title)}</b><small>${mpEsc(x.priority||'Normal')} · ${mpEsc(x.due||'')}</small><div><button class="icon-btn" onclick="mithraCycleTask('${x.id}')">Move</button><button class="icon-btn" onclick="mithraDeleteTask('${x.id}')">×</button></div></div>`).join('')||'<div class="empty">Empty</div>'}</section>`).join('')}</div>`);
+  };
+  window.mithraAddTask=function(){
+    const title=prompt('Task title');if(!title)return;
+    data.mithraControl.tasks.push({id:'TSK-'+Date.now(),title,status:'To Do',priority:'Normal',due:today});
+    save();toast('Task added');mithraTaskBoard();
+  };
+  window.mithraCycleTask=function(id){
+    const x=data.mithraControl.tasks.find(t=>t.id===id);if(!x)return;
+    x.status=x.status==='To Do'?'In Progress':x.status==='In Progress'?'Done':'To Do';save();mithraTaskBoard();
+  };
+  window.mithraDeleteTask=function(id){data.mithraControl.tasks=data.mithraControl.tasks.filter(t=>t.id!==id);save();mithraTaskBoard();};
+
+  window.mithraTablePreferences=function(){
+    const cur=data.mithraControl.tableDensity||'comfortable';
+    openModal('Table Preferences',`
+      <div class="mc-pref-row"><b>Density</b><div><button class="btn" onclick="mithraSetDensity('compact')">Compact</button><button class="btn" onclick="mithraSetDensity('comfortable')">Comfortable</button></div></div>
+      <div class="mc-pref-row"><b>Sticky headers</b><span class="mp-status">ON</span></div>
+      <div class="mc-pref-row"><b>Saved density</b><span>${mpEsc(cur)}</span></div>`);
+  };
+  window.mithraSetDensity=function(v){
+    data.mithraControl.tableDensity=v;save();
+    document.documentElement.classList.toggle('mc-compact',v==='compact');
+    toast(`Table density: ${v}`);mithraTablePreferences();
+  };
+
+  window.mithraSnooze=function(key,mins){
+    data.mithraControl.snoozed[key]=Date.now()+mins*60000;save();toast('Notification snoozed');closeModal();
+  };
+
+  function mcInstall(){
+    const top=document.querySelector('.top-actions');
+    if(top&&!top.querySelector('[data-mithra-control]')){
+      const w=document.createElement('div');w.dataset.mithraControl='1';w.className='mc-tools';
+      w.innerHTML=`<button class="icon-btn" title="Saved Views" onclick="mithraSavedViews()">▣</button><button class="icon-btn" title="Task Board" onclick="mithraTaskBoard()">✓</button><button class="icon-btn" title="Table Preferences" onclick="mithraTablePreferences()">☷</button>`;
+      top.insertBefore(w,top.firstChild);
+    }
+    if(data.mithraControl.mobileBar!==false && !document.querySelector('[data-mithra-mobilebar]')){
+      const bar=document.createElement('div');bar.dataset.mithraMobilebar='1';bar.className='mc-mobile-bar';
+      bar.innerHTML=`<button onclick="mithraAdvancedSearch()">⌕<small>Search</small></button><button onclick="mithraNotificationDrawer()">🔔<small>Alerts</small></button><button onclick="mithraSavedViews()">▣<small>Views</small></button><button onclick="mithraTaskBoard()">✓<small>Tasks</small></button>`;
+      document.body.appendChild(bar);
+    }
+  }
+  setTimeout(mcInstall,700);setInterval(()=>{try{mcInstall()}catch(e){}},5000);
+  save();
+
 })();
