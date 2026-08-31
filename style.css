@@ -247,3 +247,122 @@
     grid-column:1 / -1 !important;
   }
 }
+
+/* =========================================================
+   FINAL RESPONSIVE LAYOUT OVERRIDES
+   Responsive only — existing UI, labels, buttons and options preserved.
+   ========================================================= */
+html,body{width:100%;min-width:0;overflow-x:hidden}
+img,svg,video,canvas{max-width:100%;height:auto}
+input,select,textarea,button{max-width:100%;box-sizing:border-box}
+
+/* Keep every page inside the available viewport. */
+.main{min-width:0}
+.content{width:100%;min-width:0}
+.section,.card,.customer,.receipt,.v7-section{min-width:0}
+
+/* Tables remain usable on small screens without changing columns/options. */
+.table-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.table-scroll .table{min-width:max-content}
+
+/* Flexible page headers and action groups. */
+.title,.section-head,.v7-hero{min-width:0}
+.actions,.filters,.collection-tools,.data-actions,.cashbook-footer-actions,.modal-actions,.form-actions{max-width:100%}
+.actions .btn,.filters>*{min-width:0}
+
+/* Normal application modal */
+#modal.modal{position:fixed;inset:0;width:100%;height:100dvh;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:clamp(12px,3vw,24px);overflow-y:auto;background:#10182788;z-index:1000}
+#modal.modal.hidden{display:none}
+#modal .modal-card{width:min(760px,100%);max-width:760px;max-height:calc(100dvh - 32px);margin:auto;overflow-x:hidden;overflow-y:auto;box-sizing:border-box}
+#modal .modal-card form,#modal .modal-card .section{width:100%;min-width:0}
+#modal .form-grid{width:100%;grid-template-columns:repeat(2,minmax(0,1fr))}
+#modal .field{min-width:0}
+#modal .field input,#modal .field select,#modal .field textarea{width:100%;min-width:0;max-width:100%}
+
+/* Dynamically-created cashbook modal */
+.modal-backdrop{position:fixed;inset:0;width:100%;height:100dvh;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:clamp(12px,3vw,24px);overflow-y:auto;box-sizing:border-box}
+.modal-backdrop>.modal{position:relative;inset:auto;width:min(600px,100%);max-width:600px;max-height:calc(100dvh - 32px);margin:auto;overflow-x:hidden;overflow-y:auto;box-sizing:border-box}
+.modal-backdrop>.modal .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.modal-backdrop>.modal .form-grid>div{min-width:0}
+.modal-backdrop>.modal input,.modal-backdrop>.modal select,.modal-backdrop>.modal textarea{width:100%;min-width:0;max-width:100%}
+
+@media (max-width:1100px){
+  .content{padding:22px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .layout2,.report-grid,.settings-grid,.cash-position-grid{grid-template-columns:1fr}
+  .list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .route-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media (max-width:760px){
+  .topbar{height:64px;padding:0 12px;gap:10px}
+  .main{margin-left:0!important;width:100%!important}
+  .content{padding:16px 12px}
+  .title{width:100%;display:flex;flex-direction:column;align-items:stretch;gap:10px}
+  .title .actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .title .actions .btn{width:100%;min-height:44px;padding:9px 10px}
+  .title .actions .btn:last-child{grid-column:1/-1}
+
+  .cards,.list,.route-grid,.report-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .layout2,.report-grid,.settings-grid,.cash-position-grid{grid-template-columns:1fr}
+  .section,.card,.customer{padding:14px}
+  .section-head{gap:10px;align-items:flex-start}
+  .section-head>*{min-width:0}
+  .section-head .actions{width:auto}
+  .filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .filters input{min-width:0;width:100%;grid-column:1/-1}
+  .filters select{min-width:0;width:100%}
+  .collection-tools{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .collection-tools input{min-width:0;width:100%;grid-column:1/-1}
+  .collection-tools select{min-width:0;width:100%}
+
+  .due-row{grid-template-columns:minmax(0,1fr) auto}
+  .due-row>*:not(:first-child):not(:last-child){display:none}
+  .txn{gap:10px}
+  .txn-left{min-width:0}
+  .txn-left>div{min-width:0}
+  .txn-left b,.txn-left small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .form-grid,#modal .form-grid,.modal-backdrop>.modal .form-grid{grid-template-columns:1fr;gap:11px}
+  .form-grid .full,#modal .form-grid .full,.modal-backdrop>.modal .form-grid .full{grid-column:1/-1}
+  #modal .modal-card{width:100%;max-width:none;max-height:calc(100dvh - 24px);padding:16px;border-radius:14px}
+  #modal .modal-head{position:sticky;top:-16px;z-index:2;background:#fff;padding-top:2px;padding-bottom:12px;margin-bottom:12px}
+  .modal-backdrop>.modal{width:100%;max-width:none;max-height:calc(100dvh - 24px);padding:16px;border-radius:14px}
+  .modal-backdrop>.modal .modal-head{position:sticky;top:-16px;z-index:2;background:#fff;padding-top:2px;padding-bottom:12px}
+  .form-actions,.modal-actions{justify-content:stretch;flex-wrap:wrap}
+  .form-actions .btn,.modal-actions .btn{flex:1 1 120px;min-width:0}
+
+  .kpis,.v7-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .position-list,.closing-result,.health-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .report-bar{width:12px}
+  .report-chart{overflow:hidden}
+  .mode-report>div{grid-template-columns:55px minmax(0,1fr) 34px}
+  .receipt-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .profile-actions{width:100%}
+  .v7-grid{grid-template-columns:1fr}
+  .v7-hero{align-items:stretch;flex-direction:column}
+}
+
+@media (max-width:520px){
+  .content{padding:14px 10px}
+  .cards,.list,.route-grid,.report-cards{grid-template-columns:1fr}
+  .kpis,.v7-kpis,.position-list,.closing-result,.health-list,.receipt-grid{grid-template-columns:1fr}
+  .top-actions{gap:5px}
+  .icon-btn{min-width:40px;padding:8px}
+  .mobile-brand .brand-copy{font-size:13px}
+  .title h1{font-size:20px}
+  .title p{font-size:12px}
+  .filters,.collection-tools{grid-template-columns:1fr}
+  .filters input,.collection-tools input{grid-column:auto}
+  .actions .btn,.title .actions .btn{min-height:42px}
+  .section-head{flex-direction:column;align-items:stretch}
+  .section-head .actions{width:100%}
+  .toast{left:10px;right:10px;bottom:10px;text-align:center}
+}
+
+@media (min-width:761px){
+  /* Desktop keeps the existing sidebar and gives pages fluid width. */
+  .content{width:100%;max-width:1500px}
+  .modal-backdrop>.modal{width:min(600px,calc(100vw - 48px))}
+  #modal .modal-card{width:min(760px,calc(100vw - 48px))}
+}
